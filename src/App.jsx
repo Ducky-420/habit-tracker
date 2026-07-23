@@ -135,26 +135,16 @@ function buzz(ms = 15) {
 
 // ---- grids --------------------------------------------------
 
-function MiniGrid({ entries, color, rows = 4, cols = 10 }) {
-  const days = rows * cols;
-  const start = addDays(todayKey(), -(days - 1));
-  const cells = [];
-  for (let i = 0; i < days; i++) cells.push(addDays(start, i));
-  const columns = [];
-  for (let c = 0; c < cols; c++) columns.push(cells.slice(c * rows, c * rows + rows));
-
+function MiniBars({ color, current }) {
+  const heights = [22, 10, 10, 10];
   return (
-    <div className="flex gap-[3px]">
-      {columns.map((col, ci) => (
-        <div key={ci} className="flex flex-col gap-[3px]">
-          {col.map((key, ri) => {
-            const on = !!entries[key];
-            return (
-              <div key={ri} className="w-[9px] h-[9px] rounded-[2px] transition-all duration-200"
-                style={{ background: on ? color.fill : "#1E1E23", boxShadow: on ? `0 0 4px ${color.glow}` : "none" }} />
-            );
-          })}
-        </div>
+    <div className="flex items-end gap-[3px] h-[22px]">
+      {heights.map((h, i) => (
+        <div
+          key={i}
+          className="w-[3px] rounded-full"
+          style={{ height: h, background: i === 0 && current > 0 ? color.fill : "#2A2A32" }}
+        />
       ))}
     </div>
   );
@@ -235,7 +225,6 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
     triggeredRef.current = false;
     setLocked(null);
     setSwiping(true);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e) => {
     if (!swiping) return;
@@ -243,7 +232,11 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
     const dy = e.clientY - startY.current;
     if (!locked) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      setLocked(Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical");
+      const direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+      setLocked(direction);
+      // Capture only once a horizontal swipe is confirmed, so plain taps on
+      // inner buttons (expand toggle, edit, mark today) still receive their click.
+      if (direction === "horizontal") e.currentTarget.setPointerCapture?.(e.pointerId);
       return;
     }
     if (locked === "vertical") return;
@@ -254,9 +247,12 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
       buzz(20);
     }
   };
-  const onPointerUp = () => {
+  const onPointerUp = (e) => {
     if (!swiping) return;
     setSwiping(false);
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
     if (locked === "horizontal" && dragX > 70) onToggleToday(habit.id);
     setDragX(0);
     setLocked(null);
@@ -300,10 +296,6 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
             <h3 className="text-white text-[13px] font-semibold tracking-wide uppercase truncate">{habit.name}</h3>
           </button>
 
-          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-2 mt-1 w-full text-left">
-            <MiniGrid entries={habit.entries} color={color} />
-          </button>
-
           <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 mt-1">
             {isBreak ? <ShieldCheck size={11} style={{ color: color.fill }} /> : <Flame size={11} style={{ color: color.fill }} />}
             <span className="text-[11px] font-medium" style={{ color: color.fill }}>
@@ -313,10 +305,19 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
               style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
           </button>
 
+          {!expanded && (
+            <button onClick={() => setExpanded(true)} className="mt-2 block">
+              <MiniBars color={color} current={current} />
+            </button>
+          )}
+
           <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}>
             <div className="overflow-hidden">
               <div className="pt-2.5">
                 <FullGrid entries={habit.entries} color={color} />
+                <button onClick={() => onOpenEdit(habit)} className="mt-2.5 px-3 py-1 rounded-full bg-[#25252C] text-[12px] font-medium text-white">
+                  Edit
+                </button>
               </div>
             </div>
           </div>
@@ -835,11 +836,11 @@ const STORAGE_KEY = "habits-v5";
 
 export default function HabitTracker() {
   const [habits, setHabits, error] = useLocalStorage(STORAGE_KEY, []);
-  const [reminderTime, setReminderTime] = useLocalStorage("reminder-time", "");
   const [tab, setTab] = useState("dashboard");
   const [habitsSubview, setHabitsSubview] = useState("build");
   const [showAdd, setShowAdd] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
+  const [reminderTime, setReminderTime] = useLocalStorage("reminder-time", "");
   const [notifStatus, setNotifStatus] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [milestone, setMilestone] = useState(null);
 
@@ -852,7 +853,7 @@ export default function HabitTracker() {
       const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
       if (next <= now) next.setDate(next.getDate() + 1);
       timeoutId = setTimeout(() => {
-        const undone = habits.filter((hb) => !hb.entries[todayKey()]);
+        const undone = (habits || []).filter((hb) => !hb.entries[todayKey()]);
         if (undone.length > 0) {
           new Notification("Habit reminder", { body: `${undone.length} habit${undone.length === 1 ? "" : "s"} still waiting today.` });
         }
@@ -863,31 +864,28 @@ export default function HabitTracker() {
     return () => clearTimeout(timeoutId);
   }, [reminderTime, notifStatus, habits]);
 
-  const saveReminderTime = (value) => setReminderTime(value);
   const enableReminders = async () => {
     if (typeof Notification === "undefined") return;
     const perm = await Notification.requestPermission();
     setNotifStatus(perm);
-    if (perm === "granted" && !reminderTime) saveReminderTime("09:00");
+    if (perm === "granted" && !reminderTime) setReminderTime("09:00");
   };
-
-  const save = (next) => setHabits(next);
 
   const usedColors = habits.map((h) => h.color);
 
   const addHabit = (data) => {
-    save([...habits, { id: crypto.randomUUID(), ...data, entries: {} }]);
+    setHabits([...habits, { id: crypto.randomUUID(), ...data, entries: {} }]);
     setShowAdd(false);
   };
   const quickAddPreset = (preset) => {
-    save([...habits, { id: crypto.randomUUID(), type: habitsSubview, name: preset.name, subtitle: "", notes: "", category: preset.category, icon: preset.icon, color: preset.color, entries: {} }]);
+    setHabits([...habits, { id: crypto.randomUUID(), type: habitsSubview, name: preset.name, subtitle: "", notes: "", category: preset.category, icon: preset.icon, color: preset.color, entries: {} }]);
   };
   const updateHabit = (data) => {
-    save(habits.map((h) => (h.id === editingHabit.id ? { ...h, ...data } : h)));
+    setHabits(habits.map((h) => (h.id === editingHabit.id ? { ...h, ...data } : h)));
     setEditingHabit(null);
   };
   const deleteHabit = (id) => {
-    save(habits.filter((h) => h.id !== id));
+    setHabits(habits.filter((h) => h.id !== id));
     setEditingHabit(null);
   };
   const backfillEntry = (id, dateKey) => {
@@ -898,7 +896,7 @@ export default function HabitTracker() {
       else entries[dateKey] = true;
       return { ...h, entries };
     });
-    save(next);
+    setHabits(next);
     const updated = next.find((h) => h.id === id);
     if (updated) setEditingHabit(updated);
   };
@@ -910,7 +908,7 @@ export default function HabitTracker() {
 
     const next = habits.map((h) => (h.id === id ? { ...h, entries: { ...h.entries, [key]: !h.entries[key] || undefined } } : h));
     next.forEach((h) => { Object.keys(h.entries).forEach((k) => { if (!h.entries[k]) delete h.entries[k]; }); });
-    save(next);
+    setHabits(next);
 
     const updated = next.find((h) => h.id === id);
     const nowAfter = computeStreaks(updated.entries).current;
@@ -921,20 +919,18 @@ export default function HabitTracker() {
   };
 
   const reorder = useCallback((draggedId, targetId) => {
-    setHabits((prev) => {
-      const fromIdx = prev.findIndex((h) => h.id === draggedId);
-      const toIdx = prev.findIndex((h) => h.id === targetId);
-      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
-  }, [setHabits]);
+    const fromIdx = habits.findIndex((h) => h.id === draggedId);
+    const toIdx = habits.findIndex((h) => h.id === targetId);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    const next = [...habits];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setHabits(next);
+  }, [habits]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetData = () => {
-    save([]);
-    saveReminderTime("");
+    setHabits([]);
+    setReminderTime("");
   };
 
   const tabTitles = { dashboard: "Dashboard", habits: "Habits", stats: "Stats", settings: "Settings" };
@@ -968,7 +964,7 @@ export default function HabitTracker() {
         )}
         {tab === "stats" && <StatsTab habits={habits} />}
         {tab === "settings" && (
-          <SettingsTab reminderTime={reminderTime} saveReminderTime={saveReminderTime} enableReminders={enableReminders} notifStatus={notifStatus} onResetData={resetData} />
+          <SettingsTab reminderTime={reminderTime} saveReminderTime={setReminderTime} enableReminders={enableReminders} notifStatus={notifStatus} onResetData={resetData} />
         )}
       </div>
 
