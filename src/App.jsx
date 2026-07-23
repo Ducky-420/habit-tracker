@@ -232,11 +232,7 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
     const dy = e.clientY - startY.current;
     if (!locked) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      const direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
-      setLocked(direction);
-      // Capture only once a horizontal swipe is confirmed, so plain taps on
-      // inner buttons (expand toggle, edit, mark today) still receive their click.
-      if (direction === "horizontal") e.currentTarget.setPointerCapture?.(e.pointerId);
+      setLocked(Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical");
       return;
     }
     if (locked === "vertical") return;
@@ -247,12 +243,9 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
       buzz(20);
     }
   };
-  const onPointerUp = (e) => {
+  const onPointerUp = () => {
     if (!swiping) return;
     setSwiping(false);
-    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
     if (locked === "horizontal" && dragX > 70) onToggleToday(habit.id);
     setDragX(0);
     setLocked(null);
