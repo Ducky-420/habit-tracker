@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Plus, Flame, Check, Trash2, X, ChevronRight, GripVertical,
+  Plus, Flame, Check, Trash2, X, GripVertical,
   ListChecks, BarChart3, Settings as SettingsIcon, Sparkles, Home, ShieldCheck,
   Dumbbell, HeartPulse, Bike, Footprints, Activity, Salad, Pill, Stethoscope, Apple, Waves,
   Droplet, Droplets, Bath, Smile, ShowerHead, Scissors, Sparkle, Wind, CircleCheck,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { ACCENT, glass } from "./styles/glass";
 
 // ---- date helpers -------------------------------------------------
 
@@ -25,6 +26,13 @@ const todayKey = (d = new Date()) => {
 const addDays = (key, n) => {
   const d = new Date(key + "T00:00:00");
   d.setDate(d.getDate() + n);
+  return todayKey(d);
+};
+const isoWeekMonday = (dateKey) => {
+  const d = new Date(dateKey + "T00:00:00");
+  const day = d.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
   return todayKey(d);
 };
 
@@ -85,23 +93,48 @@ const PALETTE = [
   { name: "slate", fill: "#94A3B8", glow: "rgba(148,163,184,0.35)", dim: "#26292E" },
 ];
 
+const DAILY_TARGET = { kind: "daily" };
+
 const BUILD_PRESETS = [
-  { name: "Drink water", category: "hygiene", icon: "droplet", color: "blue" },
-  { name: "Move your body", category: "health", icon: "dumbbell", color: "gold" },
-  { name: "Read 10 minutes", category: "learning", icon: "book", color: "teal" },
+  { name: "Drink water", category: "hygiene", icon: "droplet", color: "blue", target: DAILY_TARGET },
+  { name: "Move your body", category: "health", icon: "dumbbell", color: "gold", target: DAILY_TARGET },
+  { name: "Read 10 minutes", category: "learning", icon: "book", color: "teal", target: DAILY_TARGET },
 ];
 const BREAK_PRESETS = [
-  { name: "No smoking", category: "quit", icon: "cigarette", color: "crimson" },
-  { name: "No social media before bed", category: "quit", icon: "phone", color: "slate" },
-  { name: "No junk food", category: "quit", icon: "candy", color: "amber" },
+  { name: "No smoking", category: "quit", icon: "cigarette", color: "crimson", target: DAILY_TARGET },
+  { name: "No social media before bed", category: "quit", icon: "phone", color: "slate", target: DAILY_TARGET },
+  { name: "No junk food", category: "quit", icon: "candy", color: "amber", target: DAILY_TARGET },
 ];
 
 const MILESTONES = [7, 30, 100];
 
-// ---- streak math ----------------------------------------------
+// ---- storage migration ------------------------------------------------
 
-function computeStreaks(entries) {
-  const dates = Object.keys(entries).filter((k) => entries[k]).sort();
+const STORAGE_KEY = "habits-v6";
+
+function migrateV5toV6() {
+  try {
+    if (window.localStorage.getItem(STORAGE_KEY) !== null) return;
+    const v5 = window.localStorage.getItem("habits-v5");
+    if (v5 === null) return;
+    const parsed = JSON.parse(v5);
+    const migrated = parsed.map((h) => ({ ...h, target: h.target || DAILY_TARGET }));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+  } catch {
+    // best-effort — if migration fails the app just starts fresh on v6
+  }
+}
+
+// ---- target-aware streak math ----------------------------------------
+
+function isDayDone(habit, dateKey) {
+  const v = habit.entries[dateKey];
+  if (habit.target.kind === "count") return (v || 0) >= habit.target.per;
+  return !!v;
+}
+
+function computeDailyStreak(habit) {
+  const dates = Object.keys(habit.entries).filter((k) => isDayDone(habit, k)).sort();
   if (dates.length === 0) return { current: 0, longest: 0 };
   const set = new Set(dates);
   let longest = 1, run = 1;
@@ -120,11 +153,69 @@ function computeStreaks(entries) {
   return { current, longest };
 }
 
-function last30(entries) {
+function computeWeeklyStreak(habit) {
+  const per = habit.target.per || 1;
+  const doneDates = Object.keys(habit.entries).filter((k) => !!habit.entries[k]);
+  const weekCounts = {};
+  doneDates.forEach((k) => {
+    const wk = isoWeekMonday(k);
+    weekCounts[wk] = (weekCounts[wk] || 0) + 1;
+  });
+  const metWeeks = new Set(Object.keys(weekCounts).filter((wk) => weekCounts[wk] >= per));
+  if (metWeeks.size === 0) return { current: 0, longest: 0 };
+
+  const sortedWeeks = Array.from(metWeeks).sort();
+  let longest = 1, run = 1;
+  for (let i = 1; i < sortedWeeks.length; i++) {
+    if (addDays(sortedWeeks[i - 1], 7) === sortedWeeks[i]) run += 1;
+    else run = 1;
+    longest = Math.max(longest, run);
+  }
+
+  let cursorWeek = isoWeekMonday(todayKey());
+  if (!metWeeks.has(cursorWeek)) cursorWeek = addDays(cursorWeek, -7);
+  let current = 0;
+  while (metWeeks.has(cursorWeek)) {
+    current += 1;
+    cursorWeek = addDays(cursorWeek, -7);
+  }
+  return { current, longest };
+}
+
+function habitStreak(habit) {
+  return habit.target.kind === "weekly" ? computeWeeklyStreak(habit) : computeDailyStreak(habit);
+}
+
+function doneDaysThisWeek(habit) {
+  const wk = isoWeekMonday(todayKey());
+  let count = 0;
+  for (let i = 0; i < 7; i++) {
+    if (habit.entries[addDays(wk, i)]) count += 1;
+  }
+  return count;
+}
+
+function subtitleFor(habit, streakCurrent) {
+  const isBreak = habit.type === "break";
+  if (habit.target.kind === "count") {
+    const per = habit.target.per;
+    const todayCount = habit.entries[todayKey()] || 0;
+    return `${todayCount}/${per} today · ${streakCurrent} day${streakCurrent === 1 ? "" : "s"} streak`;
+  }
+  if (habit.target.kind === "weekly") {
+    const per = habit.target.per;
+    const done = doneDaysThisWeek(habit);
+    return `${done}/${per} this week · ${streakCurrent} week${streakCurrent === 1 ? "" : "s"} streak`;
+  }
+  if (isBreak) return `${streakCurrent} day${streakCurrent === 1 ? "" : "s"} clean`;
+  return `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`;
+}
+
+function last30(habit) {
   const days = [];
   for (let i = 29; i >= 0; i--) {
     const key = addDays(todayKey(), -i);
-    days.push({ date: key.slice(5), value: entries[key] ? 1 : 0 });
+    days.push({ date: key.slice(5), value: isDayDone(habit, key) ? 1 : 0 });
   }
   return days;
 }
@@ -135,22 +226,7 @@ function buzz(ms = 15) {
 
 // ---- grids --------------------------------------------------
 
-function MiniBars({ color, current }) {
-  const heights = [22, 10, 10, 10];
-  return (
-    <div className="flex items-end gap-[3px] h-[22px]">
-      {heights.map((h, i) => (
-        <div
-          key={i}
-          className="w-[3px] rounded-full"
-          style={{ height: h, background: i === 0 && current > 0 ? color.fill : "#2A2A32" }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function FullGrid({ entries, color, rows = 6, cols = 15 }) {
+function StreakGrid({ habit, color, rows = 6, cols = 15 }) {
   const days = rows * cols;
   const start = addDays(todayKey(), -(days - 1));
   const cells = [];
@@ -163,7 +239,7 @@ function FullGrid({ entries, color, rows = 6, cols = 15 }) {
       {columns.map((col, ci) => (
         <div key={ci} className="flex flex-col gap-[4px]">
           {col.map((key, ri) => {
-            const on = !!entries[key];
+            const on = isDayDone(habit, key);
             return (
               <div key={ri} title={key} className="w-[12px] h-[12px] rounded-[3px] transition-all duration-200"
                 style={{ background: on ? color.fill : "#1E1E23", boxShadow: on ? `0 0 6px ${color.glow}` : "none" }} />
@@ -175,12 +251,115 @@ function FullGrid({ entries, color, rows = 6, cols = 15 }) {
   );
 }
 
+function WeeklyPips({ habit, onToggleToday }) {
+  const wkMonday = isoWeekMonday(todayKey());
+  const today = todayKey();
+  const color = PALETTE.find((p) => p.name === habit.color) || PALETTE[0];
+  const labels = ["M", "T", "W", "T", "F", "S", "S"];
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(addDays(wkMonday, i));
+
+  return (
+    <div className="flex gap-1.5 mt-2">
+      {days.map((d, i) => {
+        const done = !!habit.entries[d];
+        const isToday = d === today;
+        return (
+          <button
+            key={d}
+            type="button"
+            disabled={!isToday}
+            onClick={() => onToggleToday(habit.id)}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-semibold transition-all"
+            style={{
+              background: done ? color.fill : "rgba(255,255,255,0.06)",
+              color: done ? "#141417" : "#6B6B75",
+              border: isToday ? `1.5px solid ${color.fill}` : "1px solid transparent",
+              cursor: isToday ? "pointer" : "default",
+            }}
+          >
+            {labels[i]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function IconTile({ Icon, color, glowing }) {
+  return (
+    <div
+      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+      style={{
+        background: color.dim,
+        boxShadow: glowing ? `0 0 14px ${color.fill}66` : "none",
+        animation: glowing ? "glowPulse 2.2s ease-in-out infinite" : "none",
+      }}
+    >
+      <Icon size={15} style={{ color: color.fill }} />
+    </div>
+  );
+}
+
+function ConfettiBurst({ color }) {
+  const dots = Array.from({ length: 6 });
+  return (
+    <div className="pointer-events-none absolute" style={{ right: 10, top: 10, width: 0, height: 0 }}>
+      {dots.map((_, i) => {
+        const angle = (i / 6) * Math.PI * 2;
+        const dist = 28;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist;
+        return (
+          <span
+            key={i}
+            className="absolute w-1.5 h-1.5 rounded-full"
+            style={{ background: color, left: 0, top: 0, "--tx": `${tx}px`, "--ty": `${ty}px`, animation: "confettiPop 700ms ease-out forwards" }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function BigCheckButton({ habit, onPress }) {
+  const color = PALETTE.find((p) => p.name === habit.color) || PALETTE[0];
+  const isBreak = habit.type === "break";
+  const isCount = habit.target.kind === "count";
+  const per = isCount ? habit.target.per : 1;
+  const count = isCount ? (habit.entries[todayKey()] || 0) : (isDayDone(habit, todayKey()) ? 1 : 0);
+  const complete = isCount ? count >= per : isDayDone(habit, todayKey());
+  const inProgress = isCount && count > 0 && !complete;
+
+  return (
+    <button
+      onClick={() => onPress(habit.id)}
+      className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
+      style={{
+        background: complete ? color.fill : "transparent",
+        border: complete ? "2px solid #fff" : inProgress ? `2px solid ${color.fill}80` : "1.5px solid rgba(255,255,255,0.15)",
+      }}
+      aria-label={isCount ? `${count}/${per} today` : "Mark today"}
+    >
+      {complete ? (
+        <Check size={16} color="#fff" />
+      ) : isCount && count > 0 ? (
+        <span className="text-[12px] font-bold" style={{ color: color.fill }}>{count}</span>
+      ) : isBreak ? (
+        <ShieldCheck size={15} color="#4A4A54" />
+      ) : (
+        <Check size={16} color="#4A4A54" />
+      )}
+    </button>
+  );
+}
+
 // ---- quick row (dashboard) --------------------------------------------
 
 function QuickRow({ habit, onToggleToday }) {
   const color = PALETTE.find((p) => p.name === habit.color) || PALETTE[0];
   const Icon = ALL_ICONS[habit.icon] || Dumbbell;
-  const done = !!habit.entries[todayKey()];
+  const done = isDayDone(habit, todayKey());
   const isBreak = habit.type === "break";
 
   return (
@@ -201,130 +380,66 @@ function QuickRow({ habit, onToggleToday }) {
   );
 }
 
-// ---- swipeable + draggable habit row --------------------------------
+// ---- draggable "Liquid Glass" habit card --------------------------------
 
-function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging }) {
+function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging, justCompleted }) {
   const color = PALETTE.find((p) => p.name === habit.color) || PALETTE[0];
   const Icon = ALL_ICONS[habit.icon] || Dumbbell;
   const isBreak = habit.type === "break";
-  const { current } = useMemo(() => computeStreaks(habit.entries), [habit.entries]);
-  const doneToday = !!habit.entries[todayKey()];
-
-  const [dragX, setDragX] = useState(0);
-  const [swiping, setSwiping] = useState(false);
-  const [locked, setLocked] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const triggeredRef = useRef(false);
-
-  const onPointerDown = (e) => {
-    if (isDragging) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    triggeredRef.current = false;
-    setLocked(null);
-    setSwiping(true);
-  };
-  const onPointerMove = (e) => {
-    if (!swiping) return;
-    const dx = e.clientX - startX.current;
-    const dy = e.clientY - startY.current;
-    if (!locked) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      setLocked(Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical");
-      return;
-    }
-    if (locked === "vertical") return;
-    const clamped = Math.max(0, Math.min(90, dx));
-    setDragX(clamped);
-    if (clamped > 70 && !triggeredRef.current) {
-      triggeredRef.current = true;
-      buzz(20);
-    }
-  };
-  const onPointerUp = () => {
-    if (!swiping) return;
-    setSwiping(false);
-    if (locked === "horizontal" && dragX > 70) onToggleToday(habit.id);
-    setDragX(0);
-    setLocked(null);
-  };
+  const isWeekly = habit.target.kind === "weekly";
+  const { current } = useMemo(() => habitStreak(habit), [habit]);
+  const glowing = current >= 7;
 
   return (
-    <div className="relative">
-      <div className="absolute inset-0 rounded-2xl flex items-center pl-5" style={{ background: color.dim, opacity: dragX / 90 }}>
-        {isBreak ? <ShieldCheck size={18} style={{ color: color.fill }} /> : <Check size={18} style={{ color: color.fill }} />}
-      </div>
-
-      <div
-        className="relative bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3.5 flex items-start gap-3 touch-pan-y select-none"
-        style={{
-          transform: `translateX(${dragX}px) ${isDragging ? "scale(1.02)" : "scale(1)"}`,
-          transition: swiping ? "none" : "transform 200ms ease",
-          boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.4)" : "none",
-          borderLeft: isBreak ? "2px solid #DC2626" : "none",
-          zIndex: isDragging ? 10 : 1,
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+    <div
+      className="relative flex items-start gap-3 p-3.5 select-none"
+      style={{
+        ...glass(22),
+        transform: isDragging ? "scale(1.02)" : "scale(1)",
+        transition: "transform 200ms ease",
+        boxShadow: isDragging ? "0 8px 24px rgba(0,0,0,0.4)" : glass(22).boxShadow,
+        borderLeft: isBreak ? "2px solid #DC2626" : glass(22).border,
+        zIndex: isDragging ? 10 : 1,
+      }}
+    >
+      <button
+        {...dragProps}
+        className="text-[#4A4A54] shrink-0 cursor-grab active:cursor-grabbing touch-none p-2.5 -m-2.5"
+        aria-label="Drag to reorder"
       >
-        <button
-          {...dragProps}
-          onPointerDown={(e) => { e.stopPropagation(); dragProps.onPointerDown(e); }}
-          className="text-[#4A4A54] shrink-0 cursor-grab active:cursor-grabbing touch-none p-2.5 -m-2.5"
-          aria-label="Drag to reorder"
-        >
-          <GripVertical size={15} />
+        <GripVertical size={15} />
+      </button>
+
+      <IconTile Icon={Icon} color={color} glowing={glowing} />
+
+      <div className="flex-1 min-w-0">
+        <button onClick={() => onOpenEdit(habit)} className="text-left block w-full">
+          <h3 className="text-white text-[13px] font-semibold tracking-wide uppercase truncate">{habit.name}</h3>
         </button>
 
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.dim }}>
-          <Icon size={15} style={{ color: color.fill }} />
+        <div className="flex items-center gap-1 mt-1">
+          {isBreak ? <ShieldCheck size={11} style={{ color: color.fill }} /> : <Flame size={11} style={{ color: color.fill }} />}
+          <span className="text-[11px] font-medium" style={{ color: color.fill }}>
+            {subtitleFor(habit, current)}
+          </span>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <button onClick={() => onOpenEdit(habit)} className="text-left block w-full">
-            <h3 className="text-white text-[13px] font-semibold tracking-wide uppercase truncate">{habit.name}</h3>
-          </button>
-
-          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 mt-1">
-            {isBreak ? <ShieldCheck size={11} style={{ color: color.fill }} /> : <Flame size={11} style={{ color: color.fill }} />}
-            <span className="text-[11px] font-medium" style={{ color: color.fill }}>
-              {current} {isBreak ? (current === 1 ? "day clean" : "days clean") : (current === 1 ? "day" : "days")}
-            </span>
-            <ChevronRight size={11} className="text-[#6B6B75] transition-transform duration-250 ml-0.5"
-              style={{ transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }} />
-          </button>
-
-          {!expanded && (
-            <button onClick={() => setExpanded(true)} className="mt-2 block">
-              <MiniBars color={color} current={current} />
-            </button>
-          )}
-
-          <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}>
-            <div className="overflow-hidden">
-              <div className="pt-2.5">
-                <FullGrid entries={habit.entries} color={color} />
-                <button onClick={() => onOpenEdit(habit)} className="mt-2.5 px-3 py-1 rounded-full bg-[#25252C] text-[12px] font-medium text-white">
-                  Edit
-                </button>
-              </div>
+        {isWeekly ? (
+          <WeeklyPips habit={habit} onToggleToday={onToggleToday} />
+        ) : (
+          <>
+            <div className="pt-2.5">
+              <StreakGrid habit={habit} color={color} />
             </div>
-          </div>
-        </div>
-
-        <button
-          onClick={() => onToggleToday(habit.id)}
-          className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
-          style={{ background: doneToday ? color.fill : "#0F0F13", border: `1.5px solid ${doneToday ? color.fill : "#2A2A32"}` }}
-          aria-label="Mark today"
-        >
-          {doneToday ? <Check size={16} color="#0F0F13" /> : isBreak ? <ShieldCheck size={15} color="#4A4A54" /> : <Check size={16} color="#4A4A54" />}
-        </button>
+            <button onClick={() => onOpenEdit(habit)} className="mt-2.5 px-3 py-1 rounded-full bg-[#25252C] text-[12px] font-medium text-white">
+              Edit
+            </button>
+          </>
+        )}
       </div>
+
+      {!isWeekly && <BigCheckButton habit={habit} onPress={onToggleToday} />}
+      {justCompleted && <ConfettiBurst color={color.fill} />}
     </div>
   );
 }
@@ -340,7 +455,7 @@ function MilestoneToast({ habitName, days, isBreak, onDone }) {
   return (
     <div className="fixed left-1/2 -translate-x-1/2 z-50 animate-[popIn_0.35s_ease-out]" style={{ top: "calc(24px + env(safe-area-inset-top, 0px))" }}>
       <div className="bg-white text-black rounded-2xl px-4 py-3 flex items-center gap-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
-        {isBreak ? <ShieldCheck size={18} className="text-[#DC2626]" /> : <Sparkles size={18} className="text-[#F2C230]" />}
+        {isBreak ? <ShieldCheck size={18} className="text-[#DC2626]" /> : <Sparkles size={18} style={{ color: ACCENT }} />}
         <div>
           <p className="text-[13px] font-bold leading-tight">{days} days {isBreak ? "clean" : "strong"}!</p>
           <p className="text-[11px] text-[#6B6B75] leading-tight">{habitName}</p>
@@ -358,6 +473,12 @@ function MilestoneToast({ habitName, days, isBreak, onDone }) {
 
 // ---- habit form (add + edit) -------------------------------------
 
+const TARGET_OPTIONS = [
+  { key: "daily", label: "Daily" },
+  { key: "count", label: "N×/day" },
+  { key: "weekly", label: "N×/week" },
+];
+
 function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete, onBackfill, usedColors }) {
   const isEdit = !!initial;
   const [type, setType] = useState(initial?.type || defaultType);
@@ -368,6 +489,8 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
   const [iconKey, setIconKey] = useState(initial?.icon || Object.keys((CATEGORIES.find(c => c.key === (initial?.category || (defaultType === "break" ? "quit" : CATEGORIES[0].key))) || CATEGORIES[0]).icons)[0]);
   const availableColor = PALETTE.find((p) => !usedColors.includes(p.name)) || PALETTE[0];
   const [colorName, setColorName] = useState(initial?.color || (defaultType === "break" ? "crimson" : availableColor.name));
+  const [targetKind, setTargetKind] = useState(initial?.target?.kind || "daily");
+  const [targetPer, setTargetPer] = useState(initial?.target?.per || (initial?.target?.kind === "weekly" ? 3 : 2));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [backfillDate, setBackfillDate] = useState(todayKey());
   const activeCategory = CATEGORIES.find((c) => c.key === category) || CATEGORIES[0];
@@ -378,9 +501,11 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
     return () => { document.body.style.overflow = original; };
   }, []);
 
+  const perBounds = targetKind === "count" ? [2, 6] : [1, 7];
+
   return (
     <div className="fixed inset-0 z-40 bg-black/70 flex items-end sm:items-center justify-center" onClick={onCancel}>
-      <div className="w-full sm:max-w-md bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full sm:max-w-md p-4 max-h-[85vh] overflow-y-auto" style={{ ...glass(22), borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">{isEdit ? "Edit habit" : "New habit"}</h3>
           <button onClick={onCancel} className="text-[#6B6B75] hover:text-white" aria-label="Close"><X size={18} /></button>
@@ -394,7 +519,7 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
                 Build
               </button>
               <button type="button" onClick={() => setType("break")} className="flex-1 py-2 rounded-lg text-[13px] font-semibold transition-colors"
-                style={{ background: type === "break" ? "#3A1F1F" : "transparent", color: type === "break" ? "#DC2626" : "#6B6B75" }}>
+                style={{ background: type === "break" ? "rgba(220,38,38,0.16)" : "transparent", color: type === "break" ? "#FF6B6B" : "#6B6B75" }}>
                 Break
               </button>
             </div>
@@ -406,6 +531,31 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
             className="bg-[#0F0F13] border border-[#2A2A32] rounded-lg px-3 py-2 text-[13px] text-white placeholder:text-[#6B6B75] focus:outline-none focus:ring-2 focus:ring-white/20" />
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
             className="bg-[#0F0F13] border border-[#2A2A32] rounded-lg px-3 py-2 text-[13px] text-white placeholder:text-[#6B6B75] focus:outline-none focus:ring-2 focus:ring-white/20 resize-none" />
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[11px] uppercase tracking-wide text-[#8A8A94]">Target</span>
+            <div className="flex rounded-full p-1" style={glass(17)}>
+              {TARGET_OPTIONS.map((opt) => (
+                <button key={opt.key} type="button" onClick={() => setTargetKind(opt.key)}
+                  className="flex-1 py-1.5 rounded-full text-[12px] font-semibold transition-colors"
+                  style={{ background: targetKind === opt.key ? "#25252C" : "transparent", color: targetKind === opt.key ? "#fff" : "#6B6B75" }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {targetKind !== "daily" && (
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] text-[#B4B4C0]">{targetKind === "count" ? "Times per day" : "Times per week"}</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button type="button" onClick={() => setTargetPer((n) => Math.max(perBounds[0], n - 1))}
+                    className="w-7 h-7 rounded-full bg-[#0F0F13] text-white flex items-center justify-center">−</button>
+                  <span className="text-white text-[14px] font-semibold w-5 text-center">{targetPer}</span>
+                  <button type="button" onClick={() => setTargetPer((n) => Math.min(perBounds[1], n + 1))}
+                    className="w-7 h-7 rounded-full bg-[#0F0F13] text-white flex items-center justify-center">+</button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {CATEGORIES.map((c) => (
@@ -439,7 +589,7 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
               <input type="date" value={backfillDate} max={todayKey()} onChange={(e) => setBackfillDate(e.target.value)}
                 className="bg-transparent text-[13px] text-white flex-1 focus:outline-none" />
               <button type="button" onClick={() => onBackfill(initial.id, backfillDate)} className="text-[12px] font-medium text-white bg-[#25252C] px-2 py-1 rounded shrink-0">
-                {initial.entries[backfillDate] ? "Unmark" : "Mark done"}
+                {isDayDone(initial, backfillDate) ? "Unmark" : "Mark done"}
               </button>
             </div>
           )}
@@ -462,8 +612,13 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
             <div className="flex gap-2">
               <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm text-[#9494A0] hover:text-white">Cancel</button>
               <button type="button"
-                onClick={() => { if (!name.trim()) return; onSave({ type, name: name.trim(), subtitle: subtitle.trim(), notes: notes.trim(), category, icon: iconKey, color: colorName }); }}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg bg-white text-black hover:bg-[#E4E4E4]">
+                onClick={() => {
+                  if (!name.trim()) return;
+                  const target = targetKind === "daily" ? { kind: "daily" } : { kind: targetKind, per: targetPer };
+                  onSave({ type, name: name.trim(), subtitle: subtitle.trim(), notes: notes.trim(), category, icon: iconKey, color: colorName, target });
+                }}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg text-black"
+                style={{ background: ACCENT }}>
                 {isEdit ? "Save" : "Add habit"}
               </button>
             </div>
@@ -474,41 +629,43 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
   );
 }
 
-// ---- onboarding -----------------------------------------------------
+// ---- empty state -----------------------------------------------------
 
-function Onboarding({ mode, onQuickAdd, onCustom }) {
-  const presets = mode === "break" ? BREAK_PRESETS : BUILD_PRESETS;
+function EmptyState({ heading, copy, ctaLabel, onCta, presets, onQuickAdd }) {
   return (
-    <div className="text-center py-10 bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl px-5">
-      <p className="text-white text-[16px] font-semibold mb-1">
-        {mode === "break" ? "What are you ready to quit?" : "Let's start with one thing"}
-      </p>
-      <p className="text-[#8A8A94] text-[13px] mb-5">Pick one below, or make your own.</p>
-      <div className="flex flex-col gap-2 mb-4">
-        {presets.map((p) => {
-          const color = PALETTE.find((c) => c.name === p.color);
-          const Icon = ALL_ICONS[p.icon];
-          return (
-            <button key={p.name} onClick={() => onQuickAdd(p)}
-              className="flex items-center gap-3 bg-[#0F0F13] rounded-xl px-4 py-3 text-left hover:bg-[#1A1A1F] transition-colors">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.dim }}>
-                <Icon size={15} style={{ color: color.fill }} />
-              </div>
-              <span className="text-white text-[14px] font-medium">{p.name}</span>
-            </button>
-          );
-        })}
+    <div className="text-center py-10 px-5" style={glass(22)}>
+      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: `${ACCENT}22` }}>
+        <Sparkles size={20} style={{ color: ACCENT }} />
       </div>
-      <button onClick={onCustom} className="text-[13px] font-medium text-white underline underline-offset-2">
-        Create a custom habit
+      <p className="text-white text-[16px] font-semibold mb-1">{heading}</p>
+      <p className="text-[#8A8A94] text-[13px] mb-5">{copy}</p>
+      <button onClick={onCta} className="px-5 py-2.5 rounded-full text-[13px] font-semibold text-black mb-4" style={{ background: ACCENT }}>
+        {ctaLabel}
       </button>
+      {presets && presets.length > 0 && (
+        <div className="flex flex-col gap-2 mt-2">
+          {presets.map((p) => {
+            const color = PALETTE.find((c) => c.name === p.color);
+            const Icon = ALL_ICONS[p.icon];
+            return (
+              <button key={p.name} onClick={() => onQuickAdd(p)}
+                className="flex items-center gap-3 bg-[#0F0F13] rounded-xl px-4 py-3 text-left hover:bg-[#1A1A1F] transition-colors">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.dim }}>
+                  <Icon size={15} style={{ color: color.fill }} />
+                </div>
+                <span className="text-white text-[14px] font-medium">{p.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 // ---- habits tab (build/break sub-views) --------------------------------
 
-function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit, onReorder, onQuickAdd, onOpenAdd }) {
+function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit, onReorder, onQuickAdd, onOpenAdd, justCompleted }) {
   const [dragId, setDragId] = useState(null);
   const cardRefs = useRef({});
   const filtered = habits.filter((h) => h.type === subview);
@@ -541,26 +698,26 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
     };
   }, [dragId, onReorder]);
 
-  const doneCount = filtered.filter((h) => h.entries[todayKey()]).length;
+  const doneCount = filtered.filter((h) => isDayDone(h, todayKey())).length;
   const total = filtered.length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
   const isBreak = subview === "break";
 
   return (
     <>
-      <div className="flex bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-full p-1 mb-4">
+      <div className="flex rounded-full p-1 mb-4" style={glass(17)}>
         <button onClick={() => onSubviewChange("build")} className="flex-1 py-2 rounded-full text-[13px] font-semibold transition-colors"
           style={{ background: subview === "build" ? "#25252C" : "transparent", color: subview === "build" ? "#fff" : "#6B6B75" }}>
           Building
         </button>
         <button onClick={() => onSubviewChange("break")} className="flex-1 py-2 rounded-full text-[13px] font-semibold transition-colors"
-          style={{ background: subview === "break" ? "#3A1F1F" : "transparent", color: subview === "break" ? "#DC2626" : "#6B6B75" }}>
+          style={{ background: subview === "break" ? "rgba(220,38,38,0.16)" : "transparent", color: subview === "break" ? "#FF6B6B" : "#6B6B75" }}>
           Breaking
         </button>
       </div>
 
       {total > 0 && (
-        <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4 mb-3">
+        <div className="p-4 mb-3" style={glass(22)}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium text-[#B4B4C0]">
               {doneCount} of {total} {isBreak ? "clean" : "done"} today
@@ -568,13 +725,22 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
             <span className="text-[13px] font-semibold text-white">{pct}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-[#0F0F13] overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isBreak ? "#DC2626" : "#F2C230" }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isBreak ? "#DC2626" : ACCENT }} />
           </div>
         </div>
       )}
 
       <div className="flex flex-col gap-2.5">
-        {total === 0 && <Onboarding mode={subview} onQuickAdd={onQuickAdd} onCustom={onOpenAdd} />}
+        {total === 0 && (
+          <EmptyState
+            heading={subview === "break" ? "What are you ready to quit?" : "Let's start with one thing"}
+            copy="Pick one below, or make your own."
+            ctaLabel="Create a custom habit"
+            onCta={onOpenAdd}
+            presets={subview === "break" ? BREAK_PRESETS : BUILD_PRESETS}
+            onQuickAdd={onQuickAdd}
+          />
+        )}
 
         {filtered.map((h) => (
           <div key={h.id} ref={(el) => (cardRefs.current[h.id] = el)} className="animate-[fadeIn_0.25s_ease-out]">
@@ -584,6 +750,7 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
               onOpenEdit={onOpenEdit}
               isDragging={dragId === h.id}
               dragProps={{ onPointerDown: (e) => onDragStart(h.id, e) }}
+              justCompleted={!!justCompleted[h.id]}
             />
           </div>
         ))}
@@ -594,28 +761,65 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
           from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes glowPulse {
+          0%, 100% { filter: brightness(1); }
+          50% { filter: brightness(1.4); }
+        }
+        @keyframes confettiPop {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+        }
       `}</style>
     </>
   );
 }
 
-// ---- dashboard tab --------------------------------------------------
+// ---- dashboard tab (micro-dashboard) --------------------------------
 
-function DashboardTab({ habits, onToggleToday }) {
+function BarRow({ values }) {
+  return (
+    <div className="flex items-end gap-1.5 mt-2">
+      {values.map((v, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          <div className="w-full h-10 rounded-md overflow-hidden flex items-end bg-white/[0.06]">
+            <div className="w-full rounded-md" style={{ height: `${Math.max(6, v.pct)}%`, background: v.isToday ? ACCENT : "rgba(255,255,255,0.35)" }} />
+          </div>
+          <span className="text-[9px] text-[#6B6B75]">{v.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DashboardTab({ habits, onToggleToday, onGoAddHabit }) {
   const todaysKey = todayKey();
   const buildHabits = habits.filter((h) => h.type === "build");
   const breakHabits = habits.filter((h) => h.type === "break");
-  const pendingBuild = buildHabits.filter((h) => !h.entries[todaysKey]);
-  const pendingBreak = breakHabits.filter((h) => !h.entries[todaysKey]);
+  const pendingBuild = buildHabits.filter((h) => !isDayDone(h, todaysKey));
+  const pendingBreak = breakHabits.filter((h) => !isDayDone(h, todaysKey));
 
   const totalCount = habits.length;
-  const doneCount = habits.filter((h) => h.entries[todaysKey]).length;
-  const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+  const doneCount = habits.filter((h) => isDayDone(h, todaysKey)).length;
+  const completionPct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+  const bestStreak = totalCount === 0 ? 0 : Math.max(0, ...habits.map((h) => habitStreak(h).current));
+
+  const eligibleHabits = useMemo(() => habits.filter((h) => h.target.kind !== "weekly"), [habits]);
+  const last7 = useMemo(() => {
+    const out = [];
+    for (let i = 6; i >= 0; i--) {
+      const key = addDays(todaysKey, -i);
+      const label = new Date(key + "T00:00:00").toLocaleDateString(undefined, { weekday: "narrow" });
+      const done = eligibleHabits.filter((h) => isDayDone(h, key)).length;
+      const pct = eligibleHabits.length === 0 ? 0 : Math.round((done / eligibleHabits.length) * 100);
+      out.push({ label, pct, isToday: key === todaysKey });
+    }
+    return out;
+  }, [eligibleHabits, todaysKey]);
 
   const atRisk = useMemo(() => {
     const candidates = habits
-      .filter((h) => !h.entries[todaysKey])
-      .map((h) => ({ habit: h, current: computeStreaks(h.entries).current }))
+      .filter((h) => h.target.kind !== "weekly" && !isDayDone(h, todaysKey))
+      .map((h) => ({ habit: h, current: habitStreak(h).current }))
       .filter((x) => x.current > 0)
       .sort((a, b) => b.current - a.current);
     return candidates[0] || null;
@@ -623,27 +827,35 @@ function DashboardTab({ habits, onToggleToday }) {
 
   if (totalCount === 0) {
     return (
-      <div className="text-center py-16 bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl">
-        <p className="text-[#8A8A94] text-[14px]">Add a habit in the Habits tab to get started.</p>
-      </div>
+      <EmptyState
+        heading="Nothing tracked yet"
+        copy="Add your first habit and it'll show up here every day."
+        ctaLabel="Add a habit"
+        onCta={onGoAddHabit}
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] font-medium text-[#B4B4C0]">Today's score</span>
-          <span className="text-white text-[20px] font-bold">{pct}%</span>
+      <div className="p-4" style={glass(22)}>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[13px] font-medium text-[#B4B4C0]">Completion today</span>
+            <p className="text-white text-[24px] font-bold">{completionPct}%</p>
+          </div>
+          <div className="w-px h-9" style={{ background: "rgba(255,255,255,0.12)" }} />
+          <div className="text-right">
+            <span className="text-[13px] font-medium text-[#B4B4C0]">Best streak</span>
+            <p className="text-[24px] font-bold" style={{ color: ACCENT }}>{bestStreak}</p>
+          </div>
         </div>
-        <div className="h-1.5 rounded-full bg-[#0F0F13] overflow-hidden">
-          <div className="h-full rounded-full bg-[#F2C230] transition-all duration-500" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="text-[11px] text-[#6B6B75] mt-2">{doneCount} of {totalCount} across everything</p>
+        <p className="text-[11px] tracking-[0.1em] uppercase text-[#6B6B75] font-medium mt-3">Last 7 days</p>
+        <BarRow values={last7} />
       </div>
 
       {atRisk && (
-        <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4 border-l-2" style={{ borderColor: PALETTE.find((p) => p.name === atRisk.habit.color)?.fill || "#F2C230" }}>
+        <div className="p-4" style={{ ...glass(22), borderLeft: `2px solid ${PALETTE.find((p) => p.name === atRisk.habit.color)?.fill || ACCENT}` }}>
           <p className="text-[12px] text-[#8A8A94] mb-2">Don't lose this streak</p>
           <div className="flex items-center justify-between">
             <div>
@@ -652,7 +864,7 @@ function DashboardTab({ habits, onToggleToday }) {
                 {atRisk.current} {atRisk.habit.type === "break" ? "days clean" : "day streak"}
               </p>
             </div>
-            <button onClick={() => onToggleToday(atRisk.habit.id)} className="px-3 py-1.5 rounded-full bg-white text-black text-[12px] font-semibold">
+            <button onClick={() => onToggleToday(atRisk.habit.id)} className="px-3 py-1.5 rounded-full text-black text-[12px] font-semibold" style={{ background: ACCENT }}>
               {atRisk.habit.type === "break" ? "Stayed clean" : "Mark done"}
             </button>
           </div>
@@ -674,7 +886,7 @@ function DashboardTab({ habits, onToggleToday }) {
       )}
 
       {pendingBuild.length === 0 && pendingBreak.length === 0 && (
-        <div className="text-center py-8 bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl">
+        <div className="text-center py-8" style={glass(22)}>
           <p className="text-white text-[14px] font-semibold">All clear today 🎉</p>
         </div>
       )}
@@ -684,6 +896,27 @@ function DashboardTab({ habits, onToggleToday }) {
 
 // ---- stats tab --------------------------------------------------
 
+function WeeklyBars({ habit, color }) {
+  const per = habit.target.per;
+  const thisMonday = isoWeekMonday(todayKey());
+  const weeks = [];
+  for (let i = 7; i >= 0; i--) {
+    const wk = addDays(thisMonday, -7 * i);
+    let done = 0;
+    for (let d = 0; d < 7; d++) { if (habit.entries[addDays(wk, d)]) done += 1; }
+    weeks.push({ pct: Math.min(100, Math.round((done / per) * 100)) });
+  }
+  return (
+    <div className="flex items-end gap-1 h-[60px]">
+      {weeks.map((w, i) => (
+        <div key={i} className="flex-1 h-full flex items-end">
+          <div className="w-full rounded-sm" style={{ height: `${Math.max(6, w.pct)}%`, background: color.fill }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatsSection({ title, habits, isBreak }) {
   if (habits.length === 0) return null;
   return (
@@ -692,11 +925,12 @@ function StatsSection({ title, habits, isBreak }) {
       {habits.map((h) => {
         const color = PALETTE.find((p) => p.name === h.color) || PALETTE[0];
         const Icon = ALL_ICONS[h.icon] || Dumbbell;
-        const { current, longest } = computeStreaks(h.entries);
-        const data = last30(h.entries);
+        const { current, longest } = habitStreak(h);
+        const isWeekly = h.target.kind === "weekly";
+        const unit = isWeekly ? "week" : "day";
 
         return (
-          <div key={h.id} className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4">
+          <div key={h.id} className="p-4" style={glass(22)}>
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.dim }}>
                 <Icon size={13} style={{ color: color.fill }} />
@@ -704,19 +938,23 @@ function StatsSection({ title, habits, isBreak }) {
               <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">{h.name}</h3>
             </div>
             <div className="flex gap-4 mb-2 text-[12px]">
-              <span style={{ color: color.fill }}>{current} {isBreak ? "days clean" : "day streak"}</span>
-              <span className="text-[#6B6B75]">{longest} day best</span>
+              <span style={{ color: color.fill }}>{current} {unit}{current === 1 ? "" : "s"} {isBreak ? "clean" : "streak"}</span>
+              <span className="text-[#6B6B75]">{longest} {unit} best</span>
             </div>
-            <div className="h-[60px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                  <XAxis dataKey="date" hide />
-                  <YAxis hide domain={[0, 1]} />
-                  <Tooltip contentStyle={{ background: "#0F0F13", border: "none", borderRadius: 8, fontSize: 11 }} labelStyle={{ color: "#8A8A94" }} itemStyle={{ color: color.fill }} />
-                  <Line type="stepAfter" dataKey="value" stroke={color.fill} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {isWeekly ? (
+              <WeeklyBars habit={h} color={color} />
+            ) : (
+              <div className="h-[60px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={last30(h)}>
+                    <XAxis dataKey="date" hide />
+                    <YAxis hide domain={[0, 1]} />
+                    <Tooltip contentStyle={{ background: "#0F0F13", border: "none", borderRadius: 8, fontSize: 11 }} labelStyle={{ color: "#8A8A94" }} itemStyle={{ color: color.fill }} />
+                    <Line type="stepAfter" dataKey="value" stroke={color.fill} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         );
       })}
@@ -726,18 +964,19 @@ function StatsSection({ title, habits, isBreak }) {
 
 function StatsTab({ habits }) {
   const weeklyPct = useMemo(() => {
-    if (habits.length === 0) return 0;
+    const eligible = habits.filter((h) => h.target.kind !== "weekly");
+    if (eligible.length === 0) return 0;
     let done = 0, possible = 0;
     for (let i = 0; i < 7; i++) {
       const key = addDays(todayKey(), -i);
-      habits.forEach((h) => { possible += 1; if (h.entries[key]) done += 1; });
+      eligible.forEach((h) => { possible += 1; if (isDayDone(h, key)) done += 1; });
     }
     return possible === 0 ? 0 : Math.round((done / possible) * 100);
   }, [habits]);
 
   if (habits.length === 0) {
     return (
-      <div className="text-center py-16 bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl">
+      <div className="text-center py-16" style={glass(22)}>
         <p className="text-[#8A8A94] text-[14px]">Add a habit to start seeing stats.</p>
       </div>
     );
@@ -745,7 +984,7 @@ function StatsTab({ habits }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4">
+      <div className="p-4" style={glass(22)}>
         <p className="text-[13px] text-[#B4B4C0] mb-1">This week, across everything</p>
         <p className="text-white text-[28px] font-bold">{weeklyPct}%</p>
       </div>
@@ -762,7 +1001,7 @@ function SettingsTab({ reminderTime, saveReminderTime, enableReminders, notifSta
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3">
+      <div className="p-4 flex flex-col gap-3" style={glass(22)}>
         <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">Reminders</h3>
         {notifStatus === "granted" ? (
           <div className="flex items-center gap-2">
@@ -771,14 +1010,14 @@ function SettingsTab({ reminderTime, saveReminderTime, enableReminders, notifSta
               className="bg-[#0F0F13] border border-[#2A2A32] rounded-lg px-2 py-1 text-[13px] text-white focus:outline-none" />
           </div>
         ) : (
-          <button onClick={enableReminders} className="self-start px-3 py-1.5 rounded-full bg-white text-black text-[13px] font-medium">Enable reminders</button>
+          <button onClick={enableReminders} className="self-start px-3 py-1.5 rounded-full text-black text-[13px] font-medium" style={{ background: ACCENT }}>Enable reminders</button>
         )}
         <p className="text-[11px] text-[#6B6B75]">
           Reminders fire while the app is installed and recently opened. iOS may not deliver them if the app has been fully closed for a while.
         </p>
       </div>
 
-      <div className="bg-white/[0.045] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3">
+      <div className="p-4 flex flex-col gap-3" style={glass(22)}>
         <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">Data</h3>
         {!confirmReset ? (
           <button onClick={() => setConfirmReset(true)} className="self-start text-[13px] text-[#8A8A94] hover:text-[#F24E4E] flex items-center gap-1">
@@ -813,8 +1052,8 @@ function TabBar({ active, onChange }) {
           const isActive = active === t.key;
           return (
             <button key={t.key} onClick={() => onChange(t.key)} className="flex-1 flex flex-col items-center gap-1 py-2.5">
-              <Icon size={19} color={isActive ? "#F2C230" : "#6B6B75"} />
-              <span className="text-[10px] font-medium" style={{ color: isActive ? "#F2C230" : "#6B6B75" }}>{t.label}</span>
+              <Icon size={19} color={isActive ? ACCENT : "#6B6B75"} />
+              <span className="text-[10px] font-medium" style={{ color: isActive ? ACCENT : "#6B6B75" }}>{t.label}</span>
             </button>
           );
         })}
@@ -825,9 +1064,13 @@ function TabBar({ active, onChange }) {
 
 // ---- main app ------------------------------------------------------
 
-const STORAGE_KEY = "habits-v5";
-
 export default function HabitTracker() {
+  const migratedRef = useRef(false);
+  if (!migratedRef.current) {
+    migrateV5toV6();
+    migratedRef.current = true;
+  }
+
   const [habits, setHabits, error] = useLocalStorage(STORAGE_KEY, []);
   const [tab, setTab] = useState("dashboard");
   const [habitsSubview, setHabitsSubview] = useState("build");
@@ -836,6 +1079,7 @@ export default function HabitTracker() {
   const [reminderTime, setReminderTime] = useLocalStorage("reminder-time", "");
   const [notifStatus, setNotifStatus] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const [milestone, setMilestone] = useState(null);
+  const [justCompleted, setJustCompleted] = useState({});
 
   useEffect(() => {
     if (!reminderTime || notifStatus !== "granted") return;
@@ -846,7 +1090,7 @@ export default function HabitTracker() {
       const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
       if (next <= now) next.setDate(next.getDate() + 1);
       timeoutId = setTimeout(() => {
-        const undone = (habits || []).filter((hb) => !hb.entries[todayKey()]);
+        const undone = (habits || []).filter((hb) => !isDayDone(hb, todayKey()));
         if (undone.length > 0) {
           new Notification("Habit reminder", { body: `${undone.length} habit${undone.length === 1 ? "" : "s"} still waiting today.` });
         }
@@ -871,7 +1115,7 @@ export default function HabitTracker() {
     setShowAdd(false);
   };
   const quickAddPreset = (preset) => {
-    setHabits([...habits, { id: crypto.randomUUID(), type: habitsSubview, name: preset.name, subtitle: "", notes: "", category: preset.category, icon: preset.icon, color: preset.color, entries: {} }]);
+    setHabits([...habits, { id: crypto.randomUUID(), type: habitsSubview, name: preset.name, subtitle: "", notes: "", category: preset.category, icon: preset.icon, color: preset.color, target: preset.target, entries: {} }]);
   };
   const updateHabit = (data) => {
     setHabits(habits.map((h) => (h.id === editingHabit.id ? { ...h, ...data } : h)));
@@ -885,7 +1129,9 @@ export default function HabitTracker() {
     const next = habits.map((h) => {
       if (h.id !== id) return h;
       const entries = { ...h.entries };
-      if (entries[dateKey]) delete entries[dateKey];
+      const wasDone = isDayDone(h, dateKey);
+      if (wasDone) delete entries[dateKey];
+      else if (h.target.kind === "count") entries[dateKey] = h.target.per;
       else entries[dateKey] = true;
       return { ...h, entries };
     });
@@ -894,19 +1140,51 @@ export default function HabitTracker() {
     if (updated) setEditingHabit(updated);
   };
 
+  const fireConfetti = (id) => {
+    setJustCompleted((m) => ({ ...m, [id]: true }));
+    setTimeout(() => {
+      setJustCompleted((m) => {
+        const n = { ...m };
+        delete n[id];
+        return n;
+      });
+    }, 700);
+  };
+
   const toggleToday = (id) => {
     const key = todayKey();
     const habit = habits.find((h) => h.id === id);
-    const wasBefore = computeStreaks(habit.entries).current;
+    if (!habit) return;
+    const wasStreak = habitStreak(habit).current;
+    const wasDoneToday = isDayDone(habit, key);
 
-    const next = habits.map((h) => (h.id === id ? { ...h, entries: { ...h.entries, [key]: !h.entries[key] || undefined } } : h));
-    next.forEach((h) => { Object.keys(h.entries).forEach((k) => { if (!h.entries[k]) delete h.entries[k]; }); });
+    let nextEntries;
+    if (habit.target.kind === "count") {
+      const per = habit.target.per;
+      const cur = habit.entries[key] || 0;
+      const nextVal = cur >= per ? 0 : cur + 1;
+      nextEntries = { ...habit.entries };
+      if (nextVal === 0) delete nextEntries[key];
+      else nextEntries[key] = nextVal;
+    } else {
+      nextEntries = { ...habit.entries };
+      if (nextEntries[key]) delete nextEntries[key];
+      else nextEntries[key] = true;
+    }
+
+    const nextHabit = { ...habit, entries: nextEntries };
+    const next = habits.map((h) => (h.id === id ? nextHabit : h));
     setHabits(next);
 
-    const updated = next.find((h) => h.id === id);
-    const nowAfter = computeStreaks(updated.entries).current;
-    if (nowAfter > wasBefore && MILESTONES.includes(nowAfter)) {
-      setMilestone({ habitName: habit.name, days: nowAfter, isBreak: habit.type === "break" });
+    const isDoneNow = isDayDone(nextHabit, key);
+    if (!wasDoneToday && isDoneNow) {
+      fireConfetti(id);
+      buzz(20);
+    }
+
+    const nowStreak = habitStreak(nextHabit).current;
+    if (nowStreak > wasStreak && MILESTONES.includes(nowStreak)) {
+      setMilestone({ habitName: habit.name, days: nowStreak, isBreak: habit.type === "break" });
       buzz(30);
     }
   };
@@ -929,7 +1207,7 @@ export default function HabitTracker() {
   const tabTitles = { dashboard: "Dashboard", habits: "Habits", stats: "Stats", settings: "Settings" };
 
   return (
-    <div className="min-h-screen bg-black" style={{ fontFamily: "ui-rounded, -apple-system, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-[oklch(0.17_0.018_55)]" style={{ fontFamily: "ui-rounded, -apple-system, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif" }}>
       <div className="max-w-md mx-auto px-4 pb-28" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 2rem)" }}>
         <header className="mb-5">
           <p className="text-[11px] tracking-[0.15em] uppercase text-[#6B6B75] font-medium mb-1">
@@ -942,7 +1220,9 @@ export default function HabitTracker() {
           <div className="mb-4 text-[13px] text-[#F24E4E] bg-[#2A1717] border border-[#F24E4E]/30 rounded-lg px-3 py-2">{error}</div>
         )}
 
-        {tab === "dashboard" && <DashboardTab habits={habits} onToggleToday={toggleToday} />}
+        {tab === "dashboard" && (
+          <DashboardTab habits={habits} onToggleToday={toggleToday} onGoAddHabit={() => { setTab("habits"); setShowAdd(true); }} />
+        )}
         {tab === "habits" && (
           <HabitsTab
             habits={habits}
@@ -953,6 +1233,7 @@ export default function HabitTracker() {
             onReorder={reorder}
             onQuickAdd={quickAddPreset}
             onOpenAdd={() => setShowAdd(true)}
+            justCompleted={justCompleted}
           />
         )}
         {tab === "stats" && <StatsTab habits={habits} />}
@@ -963,8 +1244,8 @@ export default function HabitTracker() {
 
       {tab === "habits" && habits.filter((h) => h.type === habitsSubview).length > 0 && (
         <button onClick={() => setShowAdd(true)}
-          className="fixed left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white text-black flex items-center justify-center shadow-[0_0_24px_rgba(255,255,255,0.25)] active:scale-95 transition-transform"
-          style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
+          className="fixed left-1/2 -translate-x-1/2 w-14 h-14 rounded-full text-black flex items-center justify-center shadow-[0_0_24px_rgba(255,122,80,0.35)] active:scale-95 transition-transform"
+          style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", background: ACCENT }}
           aria-label="Add habit">
           <Plus size={22} />
         </button>
