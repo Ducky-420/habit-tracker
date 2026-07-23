@@ -1,7 +1,27 @@
 @import "tailwindcss";
 
 html, body {
-  background-color: oklch(0.17 0.018 55);
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(139,92,246,0.30) 0%, rgba(139,92,246,0) 55%),
+    radial-gradient(90% 60% at 90% 10%, rgba(168,85,247,0.18) 0%, rgba(168,85,247,0) 55%),
+    linear-gradient(180deg, #0B0B0E 0%, #000000 100%);
+  background-attachment: fixed;
   margin: 0;
   padding: 0;
+}
+
+/* .glass-surface only draws the highlight overlay — it does NOT set
+   position, since an unlayered rule here would always beat Tailwind's
+   own (layered) position utilities in the cascade. Every consumer must
+   already have position: relative/fixed of its own (via a Tailwind
+   utility class) for the ::after to anchor to it. */
+.glass-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 18%),
+    linear-gradient(90deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0) 12%, rgba(139,92,246,0) 88%, rgba(139,92,246,0.12) 100%);
 }

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { useLocalStorage } from "./hooks/useLocalStorage";
-import { ACCENT, glass } from "./styles/glass";
+import { ACCENT, ACCENT_2, glass, ctaGradient, CANVAS_BACKGROUND } from "./styles/glass";
 
 // ---- date helpers -------------------------------------------------
 
@@ -76,7 +76,6 @@ const PALETTE = [
   { name: "gold", fill: "#F2C230", glow: "rgba(242,194,48,0.35)", dim: "#3A3320" },
   { name: "red", fill: "#F24E4E", glow: "rgba(242,78,78,0.35)", dim: "#3A2323" },
   { name: "blue", fill: "#5B7CFF", glow: "rgba(91,124,255,0.35)", dim: "#232A3A" },
-  { name: "violet", fill: "#B26CF2", glow: "rgba(178,108,242,0.35)", dim: "#2E2338" },
   { name: "green", fill: "#4ED47A", glow: "rgba(78,212,122,0.35)", dim: "#20362A" },
   { name: "teal", fill: "#3ECFCB", glow: "rgba(62,207,203,0.35)", dim: "#1F3736" },
   { name: "pink", fill: "#F26CA7", glow: "rgba(242,108,167,0.35)", dim: "#3A2130" },
@@ -392,7 +391,7 @@ function HabitRow({ habit, onToggleToday, onOpenEdit, dragProps, isDragging, jus
 
   return (
     <div
-      className="relative flex items-start gap-3 p-3.5 select-none"
+      className="relative flex items-start gap-3 p-3.5 select-none glass-surface"
       style={{
         ...glass(22),
         transform: isDragging ? "scale(1.02)" : "scale(1)",
@@ -505,7 +504,7 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
 
   return (
     <div className="fixed inset-0 z-40 bg-black/70 flex items-end sm:items-center justify-center" onClick={onCancel}>
-      <div className="w-full sm:max-w-md p-4 max-h-[85vh] overflow-y-auto" style={{ ...glass(22), borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-full sm:max-w-md p-4 max-h-[85vh] overflow-y-auto glass-surface" style={{ ...glass(22), borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">{isEdit ? "Edit habit" : "New habit"}</h3>
           <button onClick={onCancel} className="text-[#6B6B75] hover:text-white" aria-label="Close"><X size={18} /></button>
@@ -534,7 +533,7 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
 
           <div className="flex flex-col gap-2">
             <span className="text-[11px] uppercase tracking-wide text-[#8A8A94]">Target</span>
-            <div className="flex rounded-full p-1" style={glass(17)}>
+            <div className="relative flex rounded-full p-1 glass-surface" style={glass(17)}>
               {TARGET_OPTIONS.map((opt) => (
                 <button key={opt.key} type="button" onClick={() => setTargetKind(opt.key)}
                   className="flex-1 py-1.5 rounded-full text-[12px] font-semibold transition-colors"
@@ -617,8 +616,8 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
                   const target = targetKind === "daily" ? { kind: "daily" } : { kind: targetKind, per: targetPer };
                   onSave({ type, name: name.trim(), subtitle: subtitle.trim(), notes: notes.trim(), category, icon: iconKey, color: colorName, target });
                 }}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg text-black"
-                style={{ background: ACCENT }}>
+                className="px-3 py-1.5 text-sm font-medium rounded-lg"
+                style={ctaGradient()}>
                 {isEdit ? "Save" : "Add habit"}
               </button>
             </div>
@@ -633,13 +632,13 @@ function HabitForm({ initial, defaultType = "build", onSave, onCancel, onDelete,
 
 function EmptyState({ heading, copy, ctaLabel, onCta, presets, onQuickAdd }) {
   return (
-    <div className="text-center py-10 px-5" style={glass(22)}>
+    <div className="relative text-center py-10 px-5 glass-surface" style={glass(22)}>
       <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: `${ACCENT}22` }}>
         <Sparkles size={20} style={{ color: ACCENT }} />
       </div>
       <p className="text-white text-[16px] font-semibold mb-1">{heading}</p>
       <p className="text-[#8A8A94] text-[13px] mb-5">{copy}</p>
-      <button onClick={onCta} className="px-5 py-2.5 rounded-full text-[13px] font-semibold text-black mb-4" style={{ background: ACCENT }}>
+      <button onClick={onCta} className="px-5 py-2.5 rounded-full text-[13px] font-semibold mb-4" style={ctaGradient()}>
         {ctaLabel}
       </button>
       {presets && presets.length > 0 && (
@@ -705,7 +704,7 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
 
   return (
     <>
-      <div className="flex rounded-full p-1 mb-4" style={glass(17)}>
+      <div className="relative flex rounded-full p-1 mb-4 glass-surface" style={glass(17)}>
         <button onClick={() => onSubviewChange("build")} className="flex-1 py-2 rounded-full text-[13px] font-semibold transition-colors"
           style={{ background: subview === "build" ? "#25252C" : "transparent", color: subview === "build" ? "#fff" : "#6B6B75" }}>
           Building
@@ -717,7 +716,7 @@ function HabitsTab({ habits, subview, onSubviewChange, onToggleToday, onOpenEdit
       </div>
 
       {total > 0 && (
-        <div className="p-4 mb-3" style={glass(22)}>
+        <div className="relative p-4 mb-3 glass-surface" style={glass(22)}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium text-[#B4B4C0]">
               {doneCount} of {total} {isBreak ? "clean" : "done"} today
@@ -782,7 +781,14 @@ function BarRow({ values }) {
       {values.map((v, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1">
           <div className="w-full h-10 rounded-md overflow-hidden flex items-end bg-white/[0.06]">
-            <div className="w-full rounded-md" style={{ height: `${Math.max(6, v.pct)}%`, background: v.isToday ? ACCENT : "rgba(255,255,255,0.35)" }} />
+            <div
+              className="w-full rounded-md"
+              style={{
+                height: `${Math.max(6, v.pct)}%`,
+                background: v.isToday ? `linear-gradient(180deg, #c4a6fb, ${ACCENT} 60%, ${ACCENT_2})` : "rgba(139,92,246,0.28)",
+                boxShadow: v.isToday ? `0 0 10px ${ACCENT_2}8C, 0 0 4px ${ACCENT}99` : "none",
+              }}
+            />
           </div>
           <span className="text-[9px] text-[#6B6B75]">{v.label}</span>
         </div>
@@ -838,16 +844,16 @@ function DashboardTab({ habits, onToggleToday, onGoAddHabit }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="p-4" style={glass(22)}>
+      <div className="relative p-4 glass-surface" style={glass(22)}>
         <div className="flex items-center justify-between">
           <div>
             <span className="text-[13px] font-medium text-[#B4B4C0]">Completion today</span>
-            <p className="text-white text-[24px] font-bold">{completionPct}%</p>
+            <p className="text-white text-[24px] font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>{completionPct}%</p>
           </div>
-          <div className="w-px h-9" style={{ background: "rgba(255,255,255,0.12)" }} />
+          <div className="w-px h-9" style={{ background: "rgba(255,255,255,0.14)" }} />
           <div className="text-right">
             <span className="text-[13px] font-medium text-[#B4B4C0]">Best streak</span>
-            <p className="text-[24px] font-bold" style={{ color: ACCENT }}>{bestStreak}</p>
+            <p className="text-[24px] font-bold" style={{ color: ACCENT, textShadow: `0 0 18px ${ACCENT}8C, 0 0 4px ${ACCENT}66`, fontVariantNumeric: "tabular-nums" }}>{bestStreak}</p>
           </div>
         </div>
         <p className="text-[11px] tracking-[0.1em] uppercase text-[#6B6B75] font-medium mt-3">Last 7 days</p>
@@ -855,7 +861,7 @@ function DashboardTab({ habits, onToggleToday, onGoAddHabit }) {
       </div>
 
       {atRisk && (
-        <div className="p-4" style={{ ...glass(22), borderLeft: `2px solid ${PALETTE.find((p) => p.name === atRisk.habit.color)?.fill || ACCENT}` }}>
+        <div className="relative p-4 glass-surface" style={{ ...glass(22), borderLeft: `2px solid ${PALETTE.find((p) => p.name === atRisk.habit.color)?.fill || ACCENT}` }}>
           <p className="text-[12px] text-[#8A8A94] mb-2">Don't lose this streak</p>
           <div className="flex items-center justify-between">
             <div>
@@ -864,7 +870,7 @@ function DashboardTab({ habits, onToggleToday, onGoAddHabit }) {
                 {atRisk.current} {atRisk.habit.type === "break" ? "days clean" : "day streak"}
               </p>
             </div>
-            <button onClick={() => onToggleToday(atRisk.habit.id)} className="px-3 py-1.5 rounded-full text-black text-[12px] font-semibold" style={{ background: ACCENT }}>
+            <button onClick={() => onToggleToday(atRisk.habit.id)} className="px-3 py-1.5 rounded-full text-[12px] font-semibold" style={ctaGradient()}>
               {atRisk.habit.type === "break" ? "Stayed clean" : "Mark done"}
             </button>
           </div>
@@ -886,7 +892,7 @@ function DashboardTab({ habits, onToggleToday, onGoAddHabit }) {
       )}
 
       {pendingBuild.length === 0 && pendingBreak.length === 0 && (
-        <div className="text-center py-8" style={glass(22)}>
+        <div className="relative text-center py-8 glass-surface" style={glass(22)}>
           <p className="text-white text-[14px] font-semibold">All clear today 🎉</p>
         </div>
       )}
@@ -930,7 +936,7 @@ function StatsSection({ title, habits, isBreak }) {
         const unit = isWeekly ? "week" : "day";
 
         return (
-          <div key={h.id} className="p-4" style={glass(22)}>
+          <div key={h.id} className="relative p-4 glass-surface" style={glass(22)}>
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: color.dim }}>
                 <Icon size={13} style={{ color: color.fill }} />
@@ -976,7 +982,7 @@ function StatsTab({ habits }) {
 
   if (habits.length === 0) {
     return (
-      <div className="text-center py-16" style={glass(22)}>
+      <div className="relative text-center py-16 glass-surface" style={glass(22)}>
         <p className="text-[#8A8A94] text-[14px]">Add a habit to start seeing stats.</p>
       </div>
     );
@@ -984,7 +990,7 @@ function StatsTab({ habits }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="p-4" style={glass(22)}>
+      <div className="relative p-4 glass-surface" style={glass(22)}>
         <p className="text-[13px] text-[#B4B4C0] mb-1">This week, across everything</p>
         <p className="text-white text-[28px] font-bold">{weeklyPct}%</p>
       </div>
@@ -1001,7 +1007,7 @@ function SettingsTab({ reminderTime, saveReminderTime, enableReminders, notifSta
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="p-4 flex flex-col gap-3" style={glass(22)}>
+      <div className="relative p-4 flex flex-col gap-3 glass-surface" style={glass(22)}>
         <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">Reminders</h3>
         {notifStatus === "granted" ? (
           <div className="flex items-center gap-2">
@@ -1010,14 +1016,14 @@ function SettingsTab({ reminderTime, saveReminderTime, enableReminders, notifSta
               className="bg-[#0F0F13] border border-[#2A2A32] rounded-lg px-2 py-1 text-[13px] text-white focus:outline-none" />
           </div>
         ) : (
-          <button onClick={enableReminders} className="self-start px-3 py-1.5 rounded-full text-black text-[13px] font-medium" style={{ background: ACCENT }}>Enable reminders</button>
+          <button onClick={enableReminders} className="self-start px-3 py-1.5 rounded-full text-[13px] font-medium" style={ctaGradient()}>Enable reminders</button>
         )}
         <p className="text-[11px] text-[#6B6B75]">
           Reminders fire while the app is installed and recently opened. iOS may not deliver them if the app has been fully closed for a while.
         </p>
       </div>
 
-      <div className="p-4 flex flex-col gap-3" style={glass(22)}>
+      <div className="relative p-4 flex flex-col gap-3 glass-surface" style={glass(22)}>
         <h3 className="text-white text-[13px] font-semibold uppercase tracking-wide">Data</h3>
         {!confirmReset ? (
           <button onClick={() => setConfirmReset(true)} className="self-start text-[13px] text-[#8A8A94] hover:text-[#F24E4E] flex items-center gap-1">
@@ -1045,19 +1051,24 @@ function TabBar({ active, onChange }) {
     { key: "settings", label: "Settings", icon: SettingsIcon },
   ];
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-[#0A0A0C]/95 backdrop-blur border-t border-[#1A1A1F]" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}>
-      <div className="max-w-md mx-auto flex items-stretch">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          const isActive = active === t.key;
-          return (
-            <button key={t.key} onClick={() => onChange(t.key)} className="flex-1 flex flex-col items-center gap-1 py-2.5">
-              <Icon size={19} color={isActive ? ACCENT : "#6B6B75"} />
-              <span className="text-[10px] font-medium" style={{ color: isActive ? ACCENT : "#6B6B75" }}>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div
+      className="fixed left-4 right-4 max-w-md mx-auto flex items-stretch glass-surface"
+      style={{ ...glass(30), bottom: "calc(16px + env(safe-area-inset-bottom, 0px))", padding: "8px 4px" }}
+    >
+      {tabs.map((t) => {
+        const Icon = t.icon;
+        const isActive = active === t.key;
+        return (
+          <button key={t.key} onClick={() => onChange(t.key)} className="flex-1 flex flex-col items-center gap-1 py-2">
+            <Icon
+              size={19}
+              color={isActive ? ACCENT : "#6B6B75"}
+              style={isActive ? { filter: `drop-shadow(0 0 6px ${ACCENT}B3)` } : undefined}
+            />
+            <span className="text-[10px] font-semibold" style={{ color: isActive ? ACCENT : "#6B6B75" }}>{t.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1207,8 +1218,8 @@ export default function HabitTracker() {
   const tabTitles = { dashboard: "Dashboard", habits: "Habits", stats: "Stats", settings: "Settings" };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.17_0.018_55)]" style={{ fontFamily: "ui-rounded, -apple-system, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif" }}>
-      <div className="max-w-md mx-auto px-4 pb-28" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 2rem)" }}>
+    <div className="min-h-screen" style={{ background: CANVAS_BACKGROUND, fontFamily: "ui-rounded, -apple-system, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif" }}>
+      <div className="max-w-md mx-auto px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 2rem)", paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}>
         <header className="mb-5">
           <p className="text-[11px] tracking-[0.15em] uppercase text-[#6B6B75] font-medium mb-1">
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
@@ -1244,8 +1255,8 @@ export default function HabitTracker() {
 
       {tab === "habits" && habits.filter((h) => h.type === habitsSubview).length > 0 && (
         <button onClick={() => setShowAdd(true)}
-          className="fixed left-1/2 -translate-x-1/2 w-14 h-14 rounded-full text-black flex items-center justify-center shadow-[0_0_24px_rgba(255,122,80,0.35)] active:scale-95 transition-transform"
-          style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", background: ACCENT }}
+          className="fixed left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          style={{ ...ctaGradient(), bottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
           aria-label="Add habit">
           <Plus size={22} />
         </button>
