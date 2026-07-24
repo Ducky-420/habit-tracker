@@ -1,0 +1,15 @@
+{
+  "name": "Habits — Streak Tracker",
+  "short_name": "Habits",
+  "description": "A minimal habit tracker with a liquid-glass dark violet interface.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0B0E",
+  "theme_color": "#0B0B0E",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
