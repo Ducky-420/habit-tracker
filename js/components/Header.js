@@ -1,4 +1,12 @@
-export function renderTopBar({ dateLabel }){
+import { iconUrl } from '../storage.js';
+
+function actionButtonHTML(id, iconSlug){
+  return `<button id="${id}" class="header-action-btn">
+    <span class="icon-mask" style="width:16px;height:16px; -webkit-mask-image:url(${iconUrl(iconSlug)}); mask-image:url(${iconUrl(iconSlug)});"></span>
+  </button>`;
+}
+
+export function renderTopBar({ dateLabel, allExpanded }){
   return `
   <div style="display:flex; align-items:center; justify-content:space-between;">
     <div>
@@ -6,15 +14,45 @@ export function renderTopBar({ dateLabel }){
       <h2 class="title-lg">Dashboard</h2>
     </div>
     <div style="display:flex; gap:8px;">
-      <button id="btn-view-toggle" class="glass" style="width:36px; height:36px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#c9c2dd; cursor:pointer;">▦</button>
-      <button id="btn-settings-shortcut" class="glass" style="width:36px; height:36px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#c9c2dd; cursor:pointer;">⚙</button>
+      ${actionButtonHTML('btn-view-toggle', 'rows-3')}
+      ${actionButtonHTML('btn-expand-collapse-all', allExpanded ? 'chevrons-down-up' : 'chevrons-up-down')}
+      ${actionButtonHTML('btn-settings-shortcut', 'settings')}
     </div>
   </div>`;
 }
 
-export function bindTopBarEvents(root, { onViewToggle, onSettings }){
+export function bindTopBarEvents(root, { onViewToggle, onExpandCollapseAll, onSettings }){
   root.querySelector('#btn-view-toggle')?.addEventListener('click', onViewToggle);
+  root.querySelector('#btn-expand-collapse-all')?.addEventListener('click', onExpandCollapseAll);
   root.querySelector('#btn-settings-shortcut')?.addEventListener('click', onSettings);
+}
+
+export function renderHabitsHeaderActions({ allExpanded }){
+  return `<div style="display:flex; gap:8px;">
+    ${actionButtonHTML('btn-habits-expand-collapse-all', allExpanded ? 'chevrons-down-up' : 'chevrons-up-down')}
+    ${actionButtonHTML('btn-habits-settings-shortcut', 'settings')}
+  </div>`;
+}
+
+export function bindHabitsHeaderActions(root, { onExpandCollapseAll, onSettings }){
+  root.querySelector('#btn-habits-expand-collapse-all')?.addEventListener('click', onExpandCollapseAll);
+  root.querySelector('#btn-habits-settings-shortcut')?.addEventListener('click', onSettings);
+}
+
+export function renderStatsHeaderActions({ timeframe }){
+  const options = [{ k: 7, l: '7D' }, { k: 30, l: '30D' }];
+  const pill = options.map(o => `
+    <span class="js-stats-timeframe" data-days="${o.k}" style="padding:8px 12px; border-radius:99px; font:700 11px sans-serif; cursor:pointer;
+      background:${timeframe===o.k?'var(--grad-primary)':'transparent'}; color:${timeframe===o.k?'#fff':'#8B84A0'};">${o.l}</span>`).join('');
+  return `<div style="display:flex; align-items:center; gap:8px;">
+    <div class="header-action-btn" style="width:auto; padding:2px; border-radius:99px;">${pill}</div>
+    ${actionButtonHTML('btn-stats-settings-shortcut', 'settings')}
+  </div>`;
+}
+
+export function bindStatsHeaderActions(root, { onTimeframeChange, onSettings }){
+  root.querySelectorAll('.js-stats-timeframe').forEach(el => el.addEventListener('click', () => onTimeframeChange(Number(el.dataset.days))));
+  root.querySelector('#btn-stats-settings-shortcut')?.addEventListener('click', onSettings);
 }
 
 export function renderGoalSummary({ completed, total, streak }){

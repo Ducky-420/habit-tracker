@@ -7,8 +7,9 @@ function dayCompletionRatios(habits, days){
   return Array.from({ length: days }, (_, d) => slices.filter(arr => arr[d] > 0).length / total);
 }
 
-function activityMatrixHTML(habits){
-  const ratios = dayCompletionRatios(habits, 30);
+function activityMatrixHTML(habits, days){
+  const ratios = dayCompletionRatios(habits, days);
+  const cols = days === 7 ? 7 : 10;
   const cells = ratios.map(r => {
     const on = r > 0;
     const alpha = (0.18 + r * 0.72).toFixed(2);
@@ -16,8 +17,8 @@ function activityMatrixHTML(habits){
   }).join('');
   return `
   <div class="glass" style="padding:18px 20px; margin-bottom:16px;">
-    <p class="eyebrow">30-Day Activity</p>
-    <div style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px;">${cells}</div>
+    <p class="eyebrow">${days}-Day Activity</p>
+    <div style="display:grid; grid-template-columns:repeat(${cols},1fr); gap:5px;">${cells}</div>
   </div>`;
 }
 
@@ -47,14 +48,14 @@ function categoryDistributionHTML(habits){
   </div>`;
 }
 
-export function renderStats(habits){
+export function renderStats(habits, timeframe = 30){
   const total = habits.length;
   const completedToday = habits.filter(h => todayCount(h) > 0).length;
   const pctToday = total ? Math.round(completedToday / total * 100) : 0;
   const streak = Math.max(0, ...habits.map(h => bestStreak(h.history)));
 
-  const weekRatios = dayCompletionRatios(habits, 7);
-  const weeklyPct = weekRatios.length ? Math.round(weekRatios.reduce((a, b) => a + b, 0) / weekRatios.length * 100) : 0;
+  const rangeRatios = dayCompletionRatios(habits, timeframe);
+  const rangePct = rangeRatios.length ? Math.round(rangeRatios.reduce((a, b) => a + b, 0) / rangeRatios.length * 100) : 0;
 
   return `
     <div class="glass" style="padding:18px 20px; margin-bottom:16px; display:flex; gap:10px;">
@@ -62,7 +63,7 @@ export function renderStats(habits){
       <div style="flex:1; border-left:1px solid rgba(255,255,255,0.14); padding-left:12px;"><p style="font:700 26px sans-serif; color:var(--violet-light); margin:0;">${pctToday}%</p><p class="body-sm">Overall completion</p></div>
     </div>
     <div class="glass" style="padding:18px 20px; margin-bottom:16px;"><p class="eyebrow">Longest streak overall</p><p style="font:700 34px sans-serif; color:#fff; margin:0;">${streak} days</p></div>
-    <div class="glass" style="padding:18px 20px; margin-bottom:16px;"><p class="eyebrow">Weekly completion rate</p><p style="font:700 34px sans-serif; color:#fff; margin:0 0 4px;">${weeklyPct}%</p><p class="body-sm">Last 7 days, across all habits</p></div>
-    ${activityMatrixHTML(habits)}
+    <div class="glass" style="padding:18px 20px; margin-bottom:16px;"><p class="eyebrow">${timeframe}-Day completion rate</p><p style="font:700 34px sans-serif; color:#fff; margin:0 0 4px;">${rangePct}%</p><p class="body-sm">Last ${timeframe} days, across all habits</p></div>
+    ${activityMatrixHTML(habits, timeframe)}
     ${categoryDistributionHTML(habits)}`;
 }

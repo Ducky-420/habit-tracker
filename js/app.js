@@ -1,5 +1,5 @@
 import { loadHabits, saveHabits, loadSettings, todayCount, bestStreak, CATEGORIES } from './storage.js';
-import { renderTopBar, bindTopBarEvents, renderGoalSummary, renderCategoryFilter, bindCategoryFilterEvents } from './components/Header.js';
+import { renderTopBar, bindTopBarEvents, renderGoalSummary, renderCategoryFilter, bindCategoryFilterEvents, renderHabitsHeaderActions, bindHabitsHeaderActions, renderStatsHeaderActions, bindStatsHeaderActions } from './components/Header.js';
 import { renderHabitCard, bindHabitCardEvents } from './components/HabitCard.js';
 import { HabitModal } from './components/HabitModal.js';
 import { renderStats } from './components/Stats.js';
@@ -9,6 +9,7 @@ let habits = loadHabits();
 let activeTab = 'dashboard';
 let dashboardFilter = 'All';
 let habitsModeFilter = 'build';
+let statsTimeframe = 30;
 
 const $ = (sel) => document.querySelector(sel);
 const pages = { dashboard: $('#page-dashboard'), habits: $('#page-habits'), stats: $('#page-stats'), settings: $('#page-settings') };
@@ -30,36 +31,52 @@ function fmtDate(){
   return new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' }).toUpperCase();
 }
 
-// FLIP-technique card resize: capture the pre-toggle size, let the state
-// change + full re-render happen (this app always renders via innerHTML
-// replacement, so there's no persistent node to transition), then apply an
-// inverted transform on the freshly-rendered node and animate it to
-// identity. Works within the existing render architecture without a bigger
-// rewrite.
-function flipToggle(container, id, action){
-  const oldEl = container.querySelector(`[data-id="${id}"]`);
-  const firstRect = oldEl ? oldEl.getBoundingClientRect() : null;
-  action();
-  if (!firstRect) return;
-  const newEl = container.querySelector(`[data-id="${id}"]`);
-  if (!newEl || firstRect.height === 0) return;
-  const lastRect = newEl.getBoundingClientRect();
-  if (lastRect.height === 0) return;
-  const scaleY = firstRect.height / lastRect.height;
-  newEl.style.transformOrigin = 'top';
-  newEl.style.transition = 'none';
-  newEl.style.transform = `scaleY(${scaleY})`;
-  newEl.style.opacity = '0.55';
-  newEl.getBoundingClientRect(); // force reflow so the transition below actually animates
-  requestAnimationFrame(() => {
-    newEl.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease';
-    newEl.style.transform = 'scaleY(1)';
-    newEl.style.opacity = '1';
-  });
-  newEl.addEventListener('transitionend', () => {
-    newEl.style.transition = ''; newEl.style.transform = ''; newEl.style.opacity = '';
-  }, { once: true });
+function areAllExpanded(list){
+  return list.length > 0 && list.every(h => h.expanded);
 }
+
+// FLIP-technique card resize, generalized to N cards at once: capture every
+// target's pre-toggle size, let the state change + full re-render happen
+// (this app always renders via innerHTML replacement, so there's no
+// persistent node to transition), then apply an inverted transform on each
+// freshly-rendered node and animate them all to identity together. Works
+// within the existing render architecture without a bigger rewrite.
+function flipToggleAll(container, ids, action){
+  const firstRects = new Map();
+  ids.forEach(id => {
+    const el = container.querySelector(`[data-id="${id}"]`);
+    if (el) firstRects.set(id, el.getBoundingClientRect());
+  });
+  action();
+  const newEls = [];
+  ids.forEach(id => {
+    const firstRect = firstRects.get(id);
+    if (!firstRect || firstRect.height === 0) return;
+    const newEl = container.querySelector(`[data-id="${id}"]`);
+    if (!newEl) return;
+    const lastRect = newEl.getBoundingClientRect();
+    if (lastRect.height === 0) return;
+    const scaleY = firstRect.height / lastRect.height;
+    newEl.style.transformOrigin = 'top';
+    newEl.style.transition = 'none';
+    newEl.style.transform = `scaleY(${scaleY})`;
+    newEl.style.opacity = '0.55';
+    newEls.push(newEl);
+  });
+  if (!newEls.length) return;
+  container.getBoundingClientRect(); // force one reflow for the whole batch
+  requestAnimationFrame(() => {
+    newEls.forEach(newEl => {
+      newEl.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease';
+      newEl.style.transform = 'scaleY(1)';
+      newEl.style.opacity = '1';
+      newEl.addEventListener('transitionend', () => {
+        newEl.style.transition = ''; newEl.style.transform = ''; newEl.style.opacity = '';
+      }, { once: true });
+    });
+  });
+}
+function flipToggle(container, id, action){ flipToggleAll(container, [id], action); }
 
 // Only celebrates on the specific click that just marked a habit
 // done/clean — never replays on unrelated re-renders, and never fires when
@@ -73,6 +90,15 @@ function celebrateToggle(container, id, action){
   btn.style.setProperty('--pulse-color', h.type === 'break' ? 'rgba(244,63,94,0.55)' : 'rgba(139,92,246,0.55)');
   btn.classList.add('celebrate');
   btn.addEventListener('animationend', () => btn.classList.remove('celebrate'), { once: true });
+}
+
+// Transient spin flourish on an expand/collapse-all icon after its mask
+// image has just been swapped to the opposite chevron.
+function flourishIcon(selector){
+  const icon = document.querySelector(`${selector} .icon-mask`);
+  if (!icon) return;
+  icon.classList.add('icon-flip');
+  icon.addEventListener('animationend', () => icon.classList.remove('icon-flip'), { once: true });
 }
 
 function emptyStateHTML(kind){
@@ -104,7 +130,7 @@ function renderDashboard(){
   const headerEl = document.getElementById('dashboard-header');
   const scrollEl = document.getElementById('dashboard-scroll');
 
-  headerEl.innerHTML = renderTopBar({ dateLabel: fmtDate() });
+  headerEl.innerHTML = renderTopBar({ dateLabel: fmtDate(), allExpanded: areAllExpanded(filtered) });
   scrollEl.innerHTML =
     renderGoalSummary({ completed, total, streak }) +
     renderCategoryFilter(categoriesInUse, dashboardFilter) +
@@ -112,6 +138,11 @@ function renderDashboard(){
 
   bindTopBarEvents(headerEl, {
     onViewToggle: () => { habits.forEach(h => h.viewMode = h.viewMode === 'pill' ? 'mosaic' : 'pill'); saveHabits(habits); renderAll(); },
+    onExpandCollapseAll: () => {
+      const willExpand = !areAllExpanded(filtered);
+      flipToggleAll(scrollEl, filtered.map(h => h.id), () => { filtered.forEach(h => h.expanded = willExpand); saveHabits(habits); renderAll(); });
+      flourishIcon('#btn-expand-collapse-all');
+    },
     onSettings: () => showTab('settings'),
   });
   bindCategoryFilterEvents(scrollEl, {
@@ -137,7 +168,18 @@ function renderHabitsPage(){
     </div>`;
   const listHTML = filtered.length ? filtered.map(renderHabitCard).join('') : emptyStateHTML(habitsModeFilter);
 
+  const actionsEl = document.getElementById('habits-header-actions');
+  actionsEl.innerHTML = renderHabitsHeaderActions({ allExpanded: areAllExpanded(filtered) });
   pages.habits.querySelector('#habits-list').innerHTML = modeToggleHTML + listHTML;
+
+  bindHabitsHeaderActions(actionsEl, {
+    onExpandCollapseAll: () => {
+      const willExpand = !areAllExpanded(filtered);
+      flipToggleAll(pages.habits, filtered.map(h => h.id), () => { filtered.forEach(h => h.expanded = willExpand); saveHabits(habits); renderAll(); });
+      flourishIcon('#btn-habits-expand-collapse-all');
+    },
+    onSettings: () => showTab('settings'),
+  });
   pages.habits.querySelectorAll('.js-habits-mode').forEach(el => el.addEventListener('click', () => { habitsModeFilter = el.dataset.mode; renderHabitsPage(); }));
   pages.habits.querySelector('.js-empty-add')?.addEventListener('click', () => modal.open(null, habitsModeFilter));
   bindHabitCardEvents(pages.habits, {
@@ -149,7 +191,13 @@ function renderHabitsPage(){
 }
 
 function renderStatsPage(){
-  pages.stats.querySelector('#stats-body').innerHTML = renderStats(habits.filter(h => !h.archived));
+  const actionsEl = document.getElementById('stats-header-actions');
+  actionsEl.innerHTML = renderStatsHeaderActions({ timeframe: statsTimeframe });
+  bindStatsHeaderActions(actionsEl, {
+    onTimeframeChange: (days) => { statsTimeframe = days; renderStatsPage(); },
+    onSettings: () => showTab('settings'),
+  });
+  pages.stats.querySelector('#stats-body').innerHTML = renderStats(habits.filter(h => !h.archived), statsTimeframe);
 }
 
 function renderSettingsPage(){

@@ -22,9 +22,12 @@
     <div class="page-scroll" id="dashboard-scroll"></div>
   </section>
   <section id="page-habits" class="page">
-    <header class="page-header">
-      <p class="eyebrow" id="habits-date"></p>
-      <h1 class="title-lg">Habits</h1>
+    <header class="page-header" id="habits-header" style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <p class="eyebrow" id="habits-date"></p>
+        <h1 class="title-lg">Habits</h1>
+      </div>
+      <div id="habits-header-actions"></div>
     </header>
     <div class="page-scroll">
       <div id="habits-list"></div>
@@ -33,9 +36,12 @@
       background:var(--grad-primary); box-shadow:0 10px 30px rgba(124,58,237,0.55); color:#fff; font:700 24px sans-serif;">+</button>
   </section>
   <section id="page-stats" class="page">
-    <header class="page-header" style="display:flex; align-items:center; gap:10px;">
-      <span class="icon-mask" style="width:24px; height:24px; color:var(--violet-light); -webkit-mask-image:url(https://unpkg.com/lucide-static@0.469.0/icons/chart-bar.svg); mask-image:url(https://unpkg.com/lucide-static@0.469.0/icons/chart-bar.svg);"></span>
-      <h1 class="title-lg">Stats</h1>
+    <header class="page-header" id="stats-header" style="display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="icon-mask" style="width:24px; height:24px; color:var(--violet-light); -webkit-mask-image:url(https://unpkg.com/lucide-static@0.469.0/icons/chart-bar.svg); mask-image:url(https://unpkg.com/lucide-static@0.469.0/icons/chart-bar.svg);"></span>
+        <h1 class="title-lg">Stats</h1>
+      </div>
+      <div id="stats-header-actions"></div>
     </header>
     <div class="page-scroll"><div id="stats-body"></div></div>
   </section>
