@@ -10,8 +10,8 @@ export class HabitModal {
   open(habit){
     this.editingId = habit ? habit.id : null;
     this.state = habit
-      ? { title: habit.title, desc: habit.desc, icon: habit.icon, themeIdx: habit.themeIdx, category: habit.category, freq: habit.freq, freqN: habit.freqN, goal: habit.goal, goalN: habit.goalN }
-      : { title:'', desc:'', icon: SYMBOL_ICONS[0], themeIdx:0, category: CATEGORIES[0], freq:'daily', freqN:1, goal:false, goalN:30 };
+      ? { title: habit.title, desc: habit.desc, icon: habit.icon, themeIdx: habit.themeIdx, customColor: habit.customColor || null, category: habit.category, freq: habit.freq, freqN: habit.freqN, goal: habit.goal, goalN: habit.goalN }
+      : { title:'', desc:'', icon: SYMBOL_ICONS[0], themeIdx:0, customColor: null, category: CATEGORIES[0], freq:'daily', freqN:1, goal:false, goalN:30 };
     this.pickerOpen = false;
     this.render();
     this.root.parentElement.classList.add('open');
@@ -20,7 +20,7 @@ export class HabitModal {
 
   render(){
     const s = this.state;
-    const grad = gradient(s.themeIdx);
+    const grad = s.customColor || gradient(s.themeIdx);
     const symbolTiles = SYMBOL_ICONS.map((icon,i) => `
       <div class="js-pick-icon" data-icon-idx="${i}" style="aspect-ratio:1; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;
         background:${icon===s.icon?grad:'rgba(255,255,255,0.04)'}; border:1px solid ${icon===s.icon?'transparent':'rgba(255,255,255,0.08)'};">
@@ -28,7 +28,11 @@ export class HabitModal {
       </div>`).join('');
     const themeSwatches = THEME_GRADIENTS.map((t,i) => `
       <div class="js-pick-theme" data-theme-idx="${i}" style="width:34px; height:34px; border-radius:50%; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font:700 12px sans-serif;
-        background:linear-gradient(155deg,${t.a},${t.b}); box-shadow:0 0 10px ${t.b}99; border:2px solid ${i===s.themeIdx?'#fff':'transparent'};">${i===s.themeIdx?'✓':''}</div>`).join('');
+        background:linear-gradient(155deg,${t.a},${t.b}); box-shadow:0 0 10px ${t.b}99; border:2px solid ${!s.customColor && i===s.themeIdx?'#fff':'transparent'};">${!s.customColor && i===s.themeIdx?'✓':''}</div>`).join('');
+    const customSwatch = `
+      <div id="custom-color-trigger" style="width:34px; height:34px; border-radius:50%; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font:700 14px sans-serif;
+        background:${s.customColor || 'conic-gradient(from 0deg,#f87171,#facc15,#4ade80,#38bdf8,#a78bfa,#f87171)'}; box-shadow:${s.customColor ? `0 0 10px ${s.customColor}99` : 'none'}; border:2px solid ${s.customColor?'#fff':'rgba(255,255,255,0.3)'};">${s.customColor?'✓':'+'}</div>
+      <input type="color" id="custom-color-input" value="${s.customColor || '#8B5CF6'}" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">`;
     const categoryPills = CATEGORIES.map(c => `
       <span class="js-pick-category" data-cat="${c}" style="padding:8px 14px; border-radius:99px; font:600 11.5px sans-serif; cursor:pointer; white-space:nowrap; flex:none;
         background:${c===s.category?grad:'rgba(255,255,255,0.03)'}; color:${c===s.category?'#fff':'#d8d1ec'}; border:1px solid ${c===s.category?'transparent':'rgba(255,255,255,0.12)'};">${c}</span>`).join('');
@@ -54,7 +58,7 @@ export class HabitModal {
       </div>
 
       <p class="eyebrow">Symbol</p>
-      <div class="glass" style="padding:10px 12px; margin-bottom:14px;">
+      <div class="glass" style="padding:18px 20px; margin-bottom:14px;">
         <div id="symbol-trigger" style="display:flex; align-items:center; gap:11px; cursor:pointer;">
           <div style="width:34px; height:34px; border-radius:10px; background:${grad}; box-shadow:0 0 10px ${THEME_GRADIENTS[s.themeIdx].b}88; display:flex; align-items:center; justify-content:center; flex:none;">
             <span class="icon-mask" style="width:16px;height:16px; -webkit-mask-image:url(${iconUrl(s.icon)}); mask-image:url(${iconUrl(s.icon)}); color:#fff;"></span>
@@ -66,12 +70,15 @@ export class HabitModal {
       </div>
 
       <p class="eyebrow">Theme</p>
-      <div class="glass" style="padding:14px 12px; margin-bottom:14px; overflow-x:auto;">
-        <div style="display:flex; gap:12px; width:max-content;">${themeSwatches}</div>
+      <div class="glass" style="padding:18px 20px; margin-bottom:14px; overflow-x:auto; position:relative;">
+        <div style="display:flex; gap:12px; width:max-content; align-items:center;">${themeSwatches}
+          <span style="width:1px; align-self:stretch; background:rgba(255,255,255,0.1); flex:none;"></span>
+          ${customSwatch}
+        </div>
       </div>
 
       <p class="eyebrow">Category</p>
-      <div class="glass" style="padding:12px; margin-bottom:14px; overflow-x:auto;">
+      <div class="glass" style="padding:18px 20px; margin-bottom:14px; overflow-x:auto;">
         <div style="display:flex; gap:8px; width:max-content;">${categoryPills}</div>
       </div>
 
@@ -84,7 +91,7 @@ export class HabitModal {
         <button id="freq-inc" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font:700 15px sans-serif; cursor:pointer;">+</button>
       </div>` : ''}
 
-      <div class="glass" style="padding:14px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
+      <div class="glass" style="padding:18px 20px; margin-top:8px; display:flex; align-items:center; justify-content:space-between;">
         <div>
           <p style="font:700 13px sans-serif; color:#fff; margin:0 0 3px;">Personal Goal</p>
           <p style="font:500 11px sans-serif; color:#8B84A0; margin:0; max-width:230px;">Set a target count for this habit.</p>
@@ -115,7 +122,9 @@ export class HabitModal {
     });
     this.root.querySelector('#symbol-trigger').addEventListener('click', () => { this.pickerOpen = !this.pickerOpen; this.render(); });
     this.root.querySelectorAll('.js-pick-icon').forEach(el => el.addEventListener('click', () => { s.icon = SYMBOL_ICONS[Number(el.dataset.iconIdx)]; this.render(); }));
-    this.root.querySelectorAll('.js-pick-theme').forEach(el => el.addEventListener('click', () => { s.themeIdx = Number(el.dataset.themeIdx); this.render(); }));
+    this.root.querySelectorAll('.js-pick-theme').forEach(el => el.addEventListener('click', () => { s.themeIdx = Number(el.dataset.themeIdx); s.customColor = null; this.render(); }));
+    this.root.querySelector('#custom-color-trigger').addEventListener('click', () => this.root.querySelector('#custom-color-input').click());
+    this.root.querySelector('#custom-color-input').addEventListener('input', (e) => { s.customColor = e.target.value; this.render(); });
     this.root.querySelectorAll('.js-pick-category').forEach(el => el.addEventListener('click', () => { s.category = el.dataset.cat; this.render(); }));
     this.root.querySelectorAll('.js-pick-target').forEach(el => el.addEventListener('click', () => { s.freq = el.dataset.mode; this.render(); }));
     this.root.querySelector('#freq-inc')?.addEventListener('click', () => { s.freqN++; this.render(); });

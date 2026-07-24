@@ -3,22 +3,22 @@ import { iconUrl, gradient, bestStreak, todayCount } from '../storage.js';
 function weekPillHTML(habit){
   const labels = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
   const last7 = habit.history.slice(-7);
-  const grad = gradient(habit.themeIdx);
+  const grad = habit.customColor || gradient(habit.themeIdx);
   const cells = last7.map((count,i) => {
     const on = count > 0;
-    return `<div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-      <div style="width:26px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    return `<div style="display:flex; flex-direction:column; align-items:center; gap:5px; flex-shrink:0;">
+      <div style="width:26px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
         background:${on ? grad : 'rgba(255,255,255,0.06)'}; box-shadow:${on ? '0 0 8px rgba(139,92,246,0.5)' : 'none'};">
         <span style="font:700 11px sans-serif; color:${on ? '#fff' : '#6b6480'};">${count}</span>
       </div>
       <span style="font:700 8px sans-serif; letter-spacing:.04em; color:#6b6480;">${labels[i]}</span>
     </div>`;
   }).join('');
-  return `<div style="margin-top:12px; padding:12px 8px; border-radius:14px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between;">${cells}</div>`;
+  return `<div style="margin-top:12px; padding:12px 8px; border-radius:14px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:space-between; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;">${cells}</div>`;
 }
 
 function mosaicHTML(habit){
-  const grad = gradient(habit.themeIdx);
+  const grad = habit.customColor || gradient(habit.themeIdx);
   const cells = habit.history.map(count => {
     const on = count > 0;
     return `<div style="aspect-ratio:1; border-radius:2.5px; background:${on ? grad : 'rgba(255,255,255,0.07)'}; box-shadow:${on ? '0 0 3px rgba(217,70,239,0.5)' : 'none'};"></div>`;
@@ -29,7 +29,7 @@ function mosaicHTML(habit){
 }
 
 export function renderHabitCard(habit){
-  const grad = gradient(habit.themeIdx);
+  const grad = habit.customColor || gradient(habit.themeIdx);
   const done = todayCount(habit) > 0;
   const streak = bestStreak(habit.history);
   const goalText = habit.goal ? `Goal reached: ${todayCount(habit)} of ${habit.freqN || 1} today` : `${habit.category}`;
@@ -41,7 +41,7 @@ export function renderHabitCard(habit){
       return `<div style="width:3px; height:${on?'100%':'40%'}; border-radius:2px; background:${on?grad:'rgba(255,255,255,0.1)'};"></div>`;
     }).join('');
     return `
-    <div class="glass" data-id="${habit.id}" style="height:56px; padding:0 14px; margin-bottom:14px; display:flex; align-items:center; gap:11px;">
+    <div class="glass" data-id="${habit.id}" style="height:56px; padding:0 14px; margin-bottom:16px; display:flex; align-items:center; gap:11px;">
       <div class="js-toggle-expand" style="flex:1; display:flex; align-items:center; gap:11px; cursor:pointer; min-width:0;">
         <div style="width:34px; height:34px; border-radius:10px; background:${grad}22; display:flex; align-items:center; justify-content:center; flex:none;">
           <span class="icon-mask" style="width:15px; height:15px; -webkit-mask-image:url(${iconUrl(habit.icon)}); mask-image:url(${iconUrl(habit.icon)}); color:${grad.match(/#\w+/)[0]};"></span>
@@ -58,7 +58,7 @@ export function renderHabitCard(habit){
   }
 
   return `
-  <div class="glass" data-id="${habit.id}" style="padding:14px; margin-bottom:14px;">
+  <div class="glass" data-id="${habit.id}" style="padding:18px 20px; margin-bottom:16px;">
     <div class="js-toggle-expand" style="display:flex; align-items:center; gap:11px; cursor:pointer;">
       <div style="width:36px; height:36px; border-radius:11px; background:${grad}22; display:flex; align-items:center; justify-content:center; flex:none;">
         <span class="icon-mask" style="width:16px; height:16px; -webkit-mask-image:url(${iconUrl(habit.icon)}); mask-image:url(${iconUrl(habit.icon)}); color:#fff;"></span>

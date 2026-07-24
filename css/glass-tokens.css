@@ -13,6 +13,7 @@
 html,body{
   margin:0; height:100%; min-height:100dvh;
   overscroll-behavior:none; background:var(--bg);
+  overflow:hidden;
 }
 html.glow-on{
   background:
@@ -34,10 +35,11 @@ a:hover{ color:#fff; }
   position:relative; background:var(--glass-fill);
   backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
   border:1px solid var(--glass-border); border-top-color:var(--glass-border-top);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 30px rgba(0,0,0,0.45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 12px 30px rgba(0,0,0,0.45), 0 10px 25px rgba(139,92,246,0.12);
   border-radius:20px;
+  transition:background .25s ease, border-color .25s ease, box-shadow .25s ease;
 }
-.glass-tight{ border-radius:18px; padding:12px 14px; }
+.glass-tight{ border-radius:18px; padding:18px 20px; }
 .eyebrow{ font:600 10px sans-serif; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); margin:0 0 8px; }
 .title-lg{ font:700 26px sans-serif; letter-spacing:-0.01em; color:#fff; margin:0; }
 .title-card{ font:700 14px sans-serif; color:#fff; margin:0; }
@@ -59,3 +61,28 @@ a:hover{ color:#fff; }
 }
 .safe-bottom{ padding-bottom:calc(var(--nav-h) + 44px + env(safe-area-inset-bottom)); }
 .hairline{ border-bottom:1px solid rgba(255,255,255,0.07); }
+
+/* Layered scroll boundary: outer canvas is a fixed frame; each page is a
+   flex column of a static header + an independently-scrolling glass pane. */
+.page{ display:none; }
+.page.active{ display:flex; flex-direction:column; height:100dvh; }
+.page-header{ flex:none; padding:calc(20px + env(safe-area-inset-top)) 16px 14px; }
+.page-scroll{
+  flex:1; min-height:0; padding:16px 16px calc(var(--nav-h) + 44px + env(safe-area-inset-bottom));
+  overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  border:1px solid rgba(255,255,255,0.08); border-radius:28px;
+  margin:0 12px 12px;
+}
+
+/* Floating glass nav — icon + label tabs with an active glass capsule */
+nav.tabbar button{
+  opacity:0.5; background:none;
+  transition:opacity .25s ease, color .25s ease, background .25s ease;
+}
+nav.tabbar button.active{
+  opacity:1; color:#A855F7;
+  background:rgba(168,85,247,0.2);
+  border:1px solid rgba(168,85,247,0.4);
+  border-radius:16px;
+}
+nav.tabbar button.active .icon-mask{ filter:drop-shadow(0 0 4px rgba(168,85,247,0.6)); }

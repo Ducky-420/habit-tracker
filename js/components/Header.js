@@ -1,9 +1,6 @@
-export function renderHeader({ dateLabel, completed, total, streak }){
-  const pct = total ? Math.round(completed/total*100) : 0;
-  const ringA = 251, offA = ringA - (ringA * pct/100);
-  const ringB = 182, offB = ringB - (ringB * Math.min(streak/14,1));
+export function renderTopBar({ dateLabel }){
   return `
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div style="display:flex; align-items:center; justify-content:space-between;">
     <div>
       <p class="eyebrow" style="margin:0 0 4px;">${dateLabel}</p>
       <h2 class="title-lg">Dashboard</h2>
@@ -12,7 +9,19 @@ export function renderHeader({ dateLabel, completed, total, streak }){
       <button id="btn-view-toggle" class="glass" style="width:36px; height:36px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#c9c2dd; cursor:pointer;">▦</button>
       <button id="btn-settings-shortcut" class="glass" style="width:36px; height:36px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; color:#c9c2dd; cursor:pointer;">⚙</button>
     </div>
-  </div>
+  </div>`;
+}
+
+export function bindTopBarEvents(root, { onViewToggle, onSettings }){
+  root.querySelector('#btn-view-toggle')?.addEventListener('click', onViewToggle);
+  root.querySelector('#btn-settings-shortcut')?.addEventListener('click', onSettings);
+}
+
+export function renderGoalSummary({ completed, total, streak }){
+  const pct = total ? Math.round(completed/total*100) : 0;
+  const ringA = 251, offA = ringA - (ringA * pct/100);
+  const ringB = 182, offB = ringB - (ringB * Math.min(streak/14,1));
+  return `
   <div class="glass" style="padding:20px; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px;">
     <div>
       <p class="eyebrow">Goal Summary</p>
@@ -31,11 +40,6 @@ export function renderHeader({ dateLabel, completed, total, streak }){
       </defs>
     </svg>
   </div>`;
-}
-
-export function bindHeaderEvents(root, { onViewToggle, onSettings }){
-  root.querySelector('#btn-view-toggle')?.addEventListener('click', onViewToggle);
-  root.querySelector('#btn-settings-shortcut')?.addEventListener('click', onSettings);
 }
 
 export function renderCategoryFilter(categories, active){

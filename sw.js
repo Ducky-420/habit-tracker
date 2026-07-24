@@ -1,8 +1,8 @@
-const CACHE = 'habits-app-v2';
+const CACHE = 'habits-app-v3';
 const ASSETS = [
   '', 'index.html', 'manifest.json', 'icon.svg', 'css/glass-tokens.css',
   'js/app.js', 'js/storage.js',
-  'js/components/Header.js', 'js/components/HabitCard.js', 'js/components/HabitModal.js', 'js/components/Settings.js'
+  'js/components/Header.js', 'js/components/HabitCard.js', 'js/components/HabitModal.js', 'js/components/Settings.js', 'js/components/Stats.js'
 ];
 
 self.addEventListener('install', (e) => {

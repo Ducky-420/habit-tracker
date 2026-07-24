@@ -1,7 +1,8 @@
 import { loadHabits, saveHabits, loadSettings, todayCount, bestStreak, CATEGORIES } from './storage.js';
-import { renderHeader, bindHeaderEvents, renderCategoryFilter, bindCategoryFilterEvents } from './components/Header.js';
+import { renderTopBar, bindTopBarEvents, renderGoalSummary, renderCategoryFilter, bindCategoryFilterEvents } from './components/Header.js';
 import { renderHabitCard, bindHabitCardEvents } from './components/HabitCard.js';
 import { HabitModal } from './components/HabitModal.js';
+import { renderStats } from './components/Stats.js';
 import { renderSettings, bindSettingsEvents } from './components/Settings.js';
 
 let habits = loadHabits();
@@ -44,19 +45,23 @@ function renderDashboard(){
         ? `<div class="glass" style="padding:24px; text-align:center;"><p class="body-sm" style="margin:0;">No habits in ${dashboardFilter} yet</p></div>`
         : '');
 
-  pages.dashboard.innerHTML =
-    renderHeader({ dateLabel: fmtDate(), completed, total, streak }) +
+  const headerEl = document.getElementById('dashboard-header');
+  const scrollEl = document.getElementById('dashboard-scroll');
+
+  headerEl.innerHTML = renderTopBar({ dateLabel: fmtDate() });
+  scrollEl.innerHTML =
+    renderGoalSummary({ completed, total, streak }) +
     renderCategoryFilter(categoriesInUse, dashboardFilter) +
     feedHTML;
 
-  bindHeaderEvents(pages.dashboard, {
+  bindTopBarEvents(headerEl, {
     onViewToggle: () => { habits.forEach(h => h.viewMode = h.viewMode === 'pill' ? 'mosaic' : 'pill'); saveHabits(habits); renderAll(); },
     onSettings: () => showTab('settings'),
   });
-  bindCategoryFilterEvents(pages.dashboard, {
+  bindCategoryFilterEvents(scrollEl, {
     onSelect: (cat) => { dashboardFilter = cat; renderDashboard(); },
   });
-  bindHabitCardEvents(pages.dashboard, {
+  bindHabitCardEvents(scrollEl, {
     onToggleExpand: (id) => { const h = habits.find(x=>x.id===id); h.expanded = !h.expanded; saveHabits(habits); renderAll(); },
     onToggleDone: (id) => { const h = habits.find(x=>x.id===id); const last = h.history.length-1; h.history[last] = h.history[last] > 0 ? 0 : (h.freqN||1); saveHabits(habits); renderAll(); },
     onEdit: (id) => modal.open(habits.find(x=>x.id===id)),
@@ -72,17 +77,8 @@ function renderHabitsPage(){
   });
 }
 
-function renderStats(){
-  const total = habits.length;
-  const completed = habits.filter(h => todayCount(h) > 0).length;
-  const pct = total ? Math.round(completed/total*100) : 0;
-  const streak = Math.max(0, ...habits.map(h => bestStreak(h.history)));
-  pages.stats.querySelector('#stats-body').innerHTML = `
-    <div class="glass" style="padding:20px; margin-bottom:14px; display:flex; gap:10px;">
-      <div style="flex:1;"><p style="font:700 26px sans-serif; color:#fff; margin:0;">${total}</p><p class="body-sm">Active habits</p></div>
-      <div style="flex:1; border-left:1px solid rgba(255,255,255,0.14); padding-left:12px;"><p style="font:700 26px sans-serif; color:var(--violet-light); margin:0;">${pct}%</p><p class="body-sm">Overall completion</p></div>
-    </div>
-    <div class="glass" style="padding:20px;"><p class="eyebrow">Longest streak overall</p><p style="font:700 34px sans-serif; color:#fff; margin:0;">${streak} days</p></div>`;
+function renderStatsPage(){
+  pages.stats.querySelector('#stats-body').innerHTML = renderStats(habits);
 }
 
 function renderSettingsPage(){
@@ -94,7 +90,7 @@ function renderSettingsPage(){
 }
 
 function renderAll(){
-  renderDashboard(); renderHabitsPage(); renderStats(); renderSettingsPage();
+  renderDashboard(); renderHabitsPage(); renderStatsPage(); renderSettingsPage();
 }
 
 function showTab(tab){

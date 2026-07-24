@@ -5,19 +5,19 @@ export function renderSettings(){
   return `
   <p class="eyebrow">Data &amp; Backup</p>
   <div class="glass" style="margin-bottom:18px; overflow:hidden;">
-    <div id="btn-export" class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; cursor:pointer;">
+    <div id="btn-export" class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; cursor:pointer;">
       <span style="font:600 13px sans-serif; color:#fff;">Export Data (JSON)</span>
       <span id="export-status" style="font:600 11px sans-serif; color:#C4A4FF;"></span>
     </div>
-    <div id="btn-import" class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; cursor:pointer;">
+    <div id="btn-import" class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; cursor:pointer;">
       <span style="font:600 13px sans-serif; color:#fff;">Import Data</span>
       <span id="import-status" style="font:600 11px sans-serif; color:#8B84A0;">No file</span>
     </div>
     <input type="file" id="file-input" accept="application/json" style="display:none;">
-    <div id="reset-row" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; cursor:pointer;">
+    <div id="reset-row" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; cursor:pointer;">
       <span style="font:600 13px sans-serif; color:#fca5a5;">Clear / Reset All Data</span>
     </div>
-    <div id="reset-confirm" style="display:none; padding:14px 16px; background:rgba(239,68,68,0.06); border-top:1px solid rgba(255,255,255,0.07);">
+    <div id="reset-confirm" style="display:none; padding:18px 20px; background:rgba(239,68,68,0.06); border-top:1px solid rgba(255,255,255,0.07);">
       <p style="font:600 12px sans-serif; color:#fca5a5; margin:0 0 10px;">Delete all habits and history? This can't be undone.</p>
       <div style="display:flex; gap:8px;">
         <span id="reset-cancel" style="flex:1; text-align:center; padding:8px 0; border-radius:10px; background:rgba(255,255,255,0.06); color:#e4dff0; font:600 12px sans-serif; cursor:pointer;">Cancel</span>
@@ -27,7 +27,7 @@ export function renderSettings(){
   </div>
 
   <p class="eyebrow">Appearance &amp; Aesthetics</p>
-  <div class="glass" style="margin-bottom:18px; padding:14px 16px;">
+  <div class="glass" style="margin-bottom:18px; padding:18px 20px;">
     <p style="font:600 13px sans-serif; color:#fff; margin:0 0 10px;">Default View Mode</p>
     <div style="display:flex; gap:4px; padding:4px; border-radius:14px; background:rgba(0,0,0,0.25); margin-bottom:16px;">
       <span id="view-pill" data-mode="pill" style="flex:1; text-align:center; padding:9px 0; border-radius:11px; font:700 12px sans-serif; cursor:pointer;
@@ -48,15 +48,15 @@ export function renderSettings(){
 
   <p class="eyebrow">App Information</p>
   <div class="glass" style="overflow:hidden;">
-    <div class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
+    <div class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px;">
       <span style="font:600 13px sans-serif; color:#fff;">Version</span>
       <span style="font:600 12px sans-serif; color:#8B84A0;">v2.0.0 (Glass Edition)</span>
     </div>
-    <div class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
+    <div class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px;">
       <span style="font:600 13px sans-serif; color:#fff;">GitHub Repo</span>
       <a href="#" style="font:600 12px sans-serif; text-decoration:none;">View source ↗</a>
     </div>
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px;">
       <span style="font:600 13px sans-serif; color:#fff;">PWA Install</span>
       <span style="display:flex; align-items:center; gap:6px; font:600 12px sans-serif; color:#6ee7b7;"><span style="width:6px; height:6px; border-radius:50%; background:#6ee7b7; box-shadow:0 0 6px #6ee7b7;"></span>Installed</span>
     </div>
