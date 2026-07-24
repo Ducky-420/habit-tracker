@@ -49,6 +49,7 @@ This is the **Option A modular layout**: each component is an independent ES mod
 - **Scorecard Mosaic** — a dense 14-column, 56-day micro-grid view as an alternate density mode, toggled per-user in Settings
 - **Compact icon picker** — a collapsible sub-sheet inside the habit editor with a 6-column Lucide icon grid, so picking a symbol never leaves the modal
 - **Curated themes & categories** — nine gradient color themes and nine organizational categories, assignable per habit from pill/swatch selectors
+- **Dynamic Category Filtering** — a horizontally scrollable glass pill bar on the Dashboard, showing only categories currently in use; tap one to filter the feed to matching habits, with a subtle empty-state notice when a category has none
 - **Flexible targets** — Daily, N×-per-day, or N×-per-week goals, plus an optional personal goal counter
 - **JSON data import/export** — one-tap export of all habits to a downloadable `.json` file, and import from a previously exported file, both from Settings
 - **Offline PWA support** — installable to the home screen, works fully offline via the service worker, and never resets your data on refresh

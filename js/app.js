@@ -1,11 +1,12 @@
-import { loadHabits, saveHabits, loadSettings, todayCount, bestStreak } from './storage.js';
-import { renderHeader, bindHeaderEvents } from './components/Header.js';
+import { loadHabits, saveHabits, loadSettings, todayCount, bestStreak, CATEGORIES } from './storage.js';
+import { renderHeader, bindHeaderEvents, renderCategoryFilter, bindCategoryFilterEvents } from './components/Header.js';
 import { renderHabitCard, bindHabitCardEvents } from './components/HabitCard.js';
 import { HabitModal } from './components/HabitModal.js';
 import { renderSettings, bindSettingsEvents } from './components/Settings.js';
 
 let habits = loadHabits();
 let activeTab = 'dashboard';
+let dashboardFilter = 'All';
 
 const $ = (sel) => document.querySelector(sel);
 const pages = { dashboard: $('#page-dashboard'), habits: $('#page-habits'), stats: $('#page-stats'), settings: $('#page-settings') };
@@ -31,10 +32,34 @@ function renderDashboard(){
   const total = habits.length;
   const completed = habits.filter(h => todayCount(h) > 0).length;
   const streak = Math.max(0, ...habits.map(h => bestStreak(h.history)));
-  pages.dashboard.innerHTML = renderHeader({ dateLabel: fmtDate(), completed, total, streak });
+
+  const usedCategories = new Set(habits.map(h => h.category));
+  if (dashboardFilter !== 'All') usedCategories.add(dashboardFilter);
+  const categoriesInUse = CATEGORIES.filter(c => usedCategories.has(c));
+
+  const filtered = dashboardFilter === 'All' ? habits : habits.filter(h => h.category === dashboardFilter);
+  const feedHTML = filtered.length
+    ? filtered.map(renderHabitCard).join('')
+    : (dashboardFilter !== 'All'
+        ? `<div class="glass" style="padding:24px; text-align:center;"><p class="body-sm" style="margin:0;">No habits in ${dashboardFilter} yet</p></div>`
+        : '');
+
+  pages.dashboard.innerHTML =
+    renderHeader({ dateLabel: fmtDate(), completed, total, streak }) +
+    renderCategoryFilter(categoriesInUse, dashboardFilter) +
+    feedHTML;
+
   bindHeaderEvents(pages.dashboard, {
     onViewToggle: () => { habits.forEach(h => h.viewMode = h.viewMode === 'pill' ? 'mosaic' : 'pill'); saveHabits(habits); renderAll(); },
     onSettings: () => showTab('settings'),
+  });
+  bindCategoryFilterEvents(pages.dashboard, {
+    onSelect: (cat) => { dashboardFilter = cat; renderDashboard(); },
+  });
+  bindHabitCardEvents(pages.dashboard, {
+    onToggleExpand: (id) => { const h = habits.find(x=>x.id===id); h.expanded = !h.expanded; saveHabits(habits); renderAll(); },
+    onToggleDone: (id) => { const h = habits.find(x=>x.id===id); const last = h.history.length-1; h.history[last] = h.history[last] > 0 ? 0 : (h.freqN||1); saveHabits(habits); renderAll(); },
+    onEdit: (id) => modal.open(habits.find(x=>x.id===id)),
   });
 }
 

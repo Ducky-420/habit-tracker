@@ -37,3 +37,18 @@ export function bindHeaderEvents(root, { onViewToggle, onSettings }){
   root.querySelector('#btn-view-toggle')?.addEventListener('click', onViewToggle);
   root.querySelector('#btn-settings-shortcut')?.addEventListener('click', onSettings);
 }
+
+export function renderCategoryFilter(categories, active){
+  const pills = ['All', ...categories];
+  const chips = pills.map(c => `
+    <span class="js-filter-pill" data-cat="${c}" style="padding:9px 16px; border-radius:99px; font:600 12px sans-serif; cursor:pointer; white-space:nowrap; flex:none;
+      background:${c===active?'var(--grad-primary)':'rgba(255,255,255,0.04)'}; color:${c===active?'#fff':'#d8d1ec'}; border:1px solid ${c===active?'transparent':'rgba(255,255,255,0.12)'};
+      box-shadow:${c===active?'0 4px 14px rgba(124,58,237,0.4)':'none'};">${c}</span>`).join('');
+  return `<div class="glass" style="padding:10px; margin-bottom:14px; overflow-x:auto;">
+    <div style="display:flex; gap:8px; width:max-content;">${chips}</div>
+  </div>`;
+}
+
+export function bindCategoryFilterEvents(root, { onSelect }){
+  root.querySelectorAll('.js-filter-pill').forEach(el => el.addEventListener('click', () => onSelect(el.dataset.cat)));
+}
