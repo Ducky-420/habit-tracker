@@ -1,55 +1,73 @@
 # iOS Liquid Glass Habit Tracker v2
 
-A modern, offline-capable habit tracking PWA styled after Apple's iOS 27 Liquid Glass aesthetic — dark violet glassmorphism, ambient glow, and a full-history heatmap. Built with plain HTML, CSS, and JavaScript — no framework, no build step.
+A high-performance, offline-first PWA inspired by native iOS 27 glassmorphism — dark violet glass cards, ambient glow, and a full habit-history view. Built with vanilla JavaScript, zero runtime dependencies, and no build step.
 
 **Live app:** https://habit-tracker-v2-one.vercel.app
 
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6%20Modules-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?style=flat-square&logo=pwa&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
 
-## Features
+## Architecture & tech stack
 
-- **iOS 27 Liquid Glass theme** — dark violet glassmorphic cards with layered blur, specular highlights, and ambient glow, built entirely from CSS `backdrop-filter` and gradients
-- **7×8 heatmap grid** — a fixed 56-day (8-week) completion history per habit, rendered as a proper grid that never collapses on mobile
-- **Standalone PWA** — installable to your home screen on iOS and Android, works fully offline via a service worker with cache-first-with-network-refresh
-- **Local storage persistence** — every habit, streak, and toggle is saved to `localStorage` and rehydrated on load, so nothing resets on refresh
-- **Full habit editor** — icon picker, curated color themes, categories, flexible targets (daily / N×-per-day / N×-per-week), and optional personal goals
-- **Floating glass navigation** — a bottom tab bar (Dashboard / Habits / Stats / Settings) with a glowing active state and a habit-adding FAB
+No framework, no bundler, no npm dependencies at runtime — just:
 
-## Tech stack
+- **Vanilla JavaScript (ES6 Modules)** — app logic split into small, focused modules loaded natively via `<script type="module">`, no build step required
+- **CSS Custom Properties & `backdrop-filter`** — the entire glass aesthetic (blur, saturation, layered borders, ambient glow) is driven by CSS variables in a single design-tokens file
+- **Service Worker API** — cache-first-with-network-refresh strategy over a versioned app-shell cache for full offline support
+- **`localStorage` persistence** — habits, streaks, and settings are saved on every mutation and rehydrated on load
 
-Vanilla HTML5, CSS3, and JavaScript — no framework, no bundler, no dependencies at runtime. Icons are loaded from the [Lucide](https://lucide.dev) static icon set via CSS masking. Deployed as a static site on [Vercel](https://vercel.com).
-
-## Project structure
+### Project structure
 
 ```
 .
-├── index.html      # Full app shell — markup, styles, and app logic
-├── manifest.json   # PWA manifest (name, icons, theme colors, display mode)
-├── sw.js           # Service worker — app-shell caching for offline use
-├── icon.svg        # Source app icon (Streak Ring design, 1024×1024)
-├── icon-192.png    # Rasterized icon for broader launcher support
-├── icon-512.png    # Rasterized icon for broader launcher support
-├── maskable-512.png
-└── apple-touch-icon.png
+├── index.html                    # App shell — tab sections, nav, modal mount point
+├── manifest.json                 # PWA manifest (icons, theme colors, display mode)
+├── sw.js                         # Service worker — app-shell caching for offline use
+├── vercel.json                   # Static deployment config (no build step)
+├── icon.svg                      # Source app icon (Streak Ring design, 1024×1024)
+├── css/
+│   └── glass-tokens.css          # Design tokens + shared glass/typography primitives
+├── js/
+│   ├── app.js                    # Entry point — routing, state, render orchestration
+│   ├── storage.js                # localStorage persistence, import/export, icon/theme data
+│   └── components/
+│       ├── Header.js             # Dashboard summary card + progress rings
+│       ├── HabitCard.js          # Collapsed/expanded habit row, weekly pill & mosaic views
+│       ├── HabitModal.js         # Add/Edit Habit full-screen sheet
+│       └── Settings.js           # Data backup, appearance, and app info panel
+└── _legacy_v1/                   # Archived Vite + React v1 build (kept for reference only)
 ```
 
-## Running locally
+This is the **Option A modular layout**: each component is an independent ES module exporting a `render*()` function and a `bind*Events()` function, composed together in `js/app.js` with no shared framework runtime.
 
-No build step is required — it's a static site. Any local server works, for example:
+## Key features
+
+- **Weekly Pill rows** — a 7-day per-habit strip with count badges and a glow state for completed days
+- **Scorecard Mosaic** — a dense 14-column, 56-day micro-grid view as an alternate density mode, toggled per-user in Settings
+- **Compact icon picker** — a collapsible sub-sheet inside the habit editor with a 6-column Lucide icon grid, so picking a symbol never leaves the modal
+- **Curated themes & categories** — nine gradient color themes and nine organizational categories, assignable per habit from pill/swatch selectors
+- **Flexible targets** — Daily, N×-per-day, or N×-per-week goals, plus an optional personal goal counter
+- **JSON data import/export** — one-tap export of all habits to a downloadable `.json` file, and import from a previously exported file, both from Settings
+- **Offline PWA support** — installable to the home screen, works fully offline via the service worker, and never resets your data on refresh
+
+## Local development
+
+No build step is required — it's a static site. Any local static server works:
 
 ```bash
 npx serve .
 ```
 
-Then open the printed `http://localhost:...` URL in your browser. Opening `index.html` directly via `file://` also works, but installing as a PWA and testing the service worker requires it to be served over `http://localhost` or `https`.
+Or with VS Code's **Live Server** extension: right-click `index.html` → **Open with Live Server**.
+
+Then open the printed `http://localhost:...` URL. Opening `index.html` directly via `file://` also renders the app, but installing as a PWA and testing the service worker requires serving it over `http://localhost` or `https`.
 
 ## Deploying
 
-The project deploys as-is to any static host. On Vercel:
+The project deploys as-is to any static host. `vercel.json` at the repo root pins the project to a static build (`framework: null`, no build command) so Vercel serves `index.html` directly instead of searching for a Node/Vite pipeline:
 
 ```bash
 npx vercel --prod
