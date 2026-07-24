@@ -7,11 +7,11 @@ export class HabitModal {
     this.state = null;
   }
 
-  open(habit){
+  open(habit, defaultType){
     this.editingId = habit ? habit.id : null;
     this.state = habit
-      ? { title: habit.title, desc: habit.desc, icon: habit.icon, themeIdx: habit.themeIdx, customColor: habit.customColor || null, category: habit.category, freq: habit.freq, freqN: habit.freqN, goal: habit.goal, goalN: habit.goalN }
-      : { title:'', desc:'', icon: SYMBOL_ICONS[0], themeIdx:0, customColor: null, category: CATEGORIES[0], freq:'daily', freqN:1, goal:false, goalN:30 };
+      ? { title: habit.title, desc: habit.desc, icon: habit.icon, themeIdx: habit.themeIdx, customColor: habit.customColor || null, category: habit.category, freq: habit.freq, freqN: habit.freqN, goal: habit.goal, goalN: habit.goalN, type: habit.type || 'build', archived: habit.archived || false }
+      : { title:'', desc:'', icon: SYMBOL_ICONS[0], themeIdx: defaultType==='break'?7:0, customColor: null, category: CATEGORIES[0], freq:'daily', freqN:1, goal:false, goalN:30, type: defaultType || 'build', archived:false };
     this.pickerOpen = false;
     this.render();
     this.root.parentElement.classList.add('open');
@@ -40,6 +40,10 @@ export class HabitModal {
     const targetPills = modes.map(m => `
       <span class="js-pick-target" data-mode="${m.k}" style="flex:1; text-align:center; padding:10px 0; border-radius:14px; cursor:pointer; font:700 12px sans-serif;
         background:${s.freq===m.k?'#fff':'transparent'}; color:${s.freq===m.k?'#151022':'#8B84A0'};">${m.l}</span>`).join('');
+    const habitModes = [{k:'build',l:'Build (Good Habit)'},{k:'break',l:'Break (Bad Habit)'}];
+    const habitModeTiles = habitModes.map(m => `
+      <span class="js-pick-habit-mode" data-habit-mode="${m.k}" style="flex:1; text-align:center; padding:12px 0; border-radius:14px; cursor:pointer; font:700 12px sans-serif;
+        background:${s.type===m.k ? (m.k==='break' ? 'linear-gradient(155deg,#fb7185,#e11d48)' : 'var(--grad-primary)') : 'transparent'}; color:${s.type===m.k?'#fff':'#8B84A0'};">${m.l}</span>`).join('');
     const freqUnit = s.freq === 'perweek' ? '/ week' : '/ day';
     const activeIconName = s.icon.replace(/-/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
 
@@ -48,8 +52,11 @@ export class HabitModal {
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
         <button id="modal-close" style="width:34px; height:34px; border-radius:50%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e4dff0; font:600 15px sans-serif; cursor:pointer;">×</button>
         <p style="font:700 14px sans-serif; color:#fff; margin:0;">${this.editingId ? 'Edit Habit' : 'New Habit'}</p>
-        <button id="modal-save" style="width:34px; height:34px; border-radius:50%; border:none; background:${grad}; box-shadow:0 0 12px rgba(139,92,246,0.5); color:#fff; font:700 13px sans-serif; cursor:pointer;">✓</button>
+        <button id="modal-save" style="width:34px; height:34px; border-radius:50%; border:none; background:${grad}; box-shadow:0 0 12px ${s.type==='break'?'rgba(244,63,94,0.5)':'rgba(139,92,246,0.5)'}; color:#fff; font:700 13px sans-serif; cursor:pointer;">✓</button>
       </div>
+
+      <p class="eyebrow">Habit Mode</p>
+      <div class="glass" style="padding:5px; margin-bottom:14px; display:flex; gap:4px;">${habitModeTiles}</div>
 
       <p class="eyebrow">Details</p>
       <div class="glass glass-tight" style="margin-bottom:14px;">
@@ -106,6 +113,11 @@ export class HabitModal {
         <span style="font:700 13px sans-serif; color:#fff; min-width:70px; text-align:center;">${s.goalN} days</span>
         <button id="goal-inc" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font:700 15px sans-serif; cursor:pointer;">+</button>
       </div>` : ''}
+      ${this.editingId ? `
+      <div id="archive-row" class="glass" style="padding:14px 20px; margin-top:14px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span style="font:600 13px sans-serif; color:#e4dff0;">${s.archived ? 'Unarchive Habit' : 'Archive Habit'}</span>
+        <span class="icon-mask" style="width:16px;height:16px; -webkit-mask-image:url(${iconUrl('archive')}); mask-image:url(${iconUrl('archive')}); color:#8B84A0;"></span>
+      </div>` : ''}
     </div>`;
 
     this.bindEvents();
@@ -123,6 +135,12 @@ export class HabitModal {
     this.root.querySelector('#symbol-trigger').addEventListener('click', () => { this.pickerOpen = !this.pickerOpen; this.render(); });
     this.root.querySelectorAll('.js-pick-icon').forEach(el => el.addEventListener('click', () => { s.icon = SYMBOL_ICONS[Number(el.dataset.iconIdx)]; this.render(); }));
     this.root.querySelectorAll('.js-pick-theme').forEach(el => el.addEventListener('click', () => { s.themeIdx = Number(el.dataset.themeIdx); s.customColor = null; this.render(); }));
+    this.root.querySelectorAll('.js-pick-habit-mode').forEach(el => el.addEventListener('click', () => {
+      const wasUntouched = s.themeIdx === 0 && !s.customColor;
+      s.type = el.dataset.habitMode;
+      if (s.type === 'break' && wasUntouched) s.themeIdx = 7; // Crimson Red preset — smart default for a fresh, uncustomized habit
+      this.render();
+    }));
     this.root.querySelector('#custom-color-trigger').addEventListener('click', () => this.root.querySelector('#custom-color-input').click());
     this.root.querySelector('#custom-color-input').addEventListener('input', (e) => { s.customColor = e.target.value; this.render(); });
     this.root.querySelectorAll('.js-pick-category').forEach(el => el.addEventListener('click', () => { s.category = el.dataset.cat; this.render(); }));
@@ -132,5 +150,10 @@ export class HabitModal {
     this.root.querySelector('#goal-switch').addEventListener('click', () => { s.goal = !s.goal; this.render(); });
     this.root.querySelector('#goal-inc')?.addEventListener('click', () => { s.goalN++; this.render(); });
     this.root.querySelector('#goal-dec')?.addEventListener('click', () => { s.goalN = Math.max(1, s.goalN-1); this.render(); });
+    this.root.querySelector('#archive-row')?.addEventListener('click', () => {
+      s.archived = !s.archived;
+      this.onSave(this.editingId, s);
+      this.close();
+    });
   }
 }

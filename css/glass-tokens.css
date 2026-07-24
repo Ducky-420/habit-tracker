@@ -35,7 +35,7 @@ a:hover{ color:#fff; }
   position:relative; background:var(--glass-fill);
   backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
   border:1px solid var(--glass-border); border-top-color:var(--glass-border-top);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 12px 30px rgba(0,0,0,0.45), 0 10px 25px rgba(139,92,246,0.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 12px 30px rgba(0,0,0,0.45), 0 10px 25px rgba(139,92,246,0.12);
   border-radius:20px;
   transition:background .25s ease, border-color .25s ease, box-shadow .25s ease;
 }
@@ -74,15 +74,58 @@ a:hover{ color:#fff; }
   margin:0 12px 12px;
 }
 
-/* Floating glass nav — icon + label tabs with an active glass capsule */
+/* Floating glass nav — icon + label tabs with an active glass capsule.
+   Color (not opacity) drives the inactive/active look so the icon-mask's
+   background:currentColor picks up the exact same token as the label. */
 nav.tabbar button{
-  opacity:0.5; background:none;
-  transition:opacity .25s ease, color .25s ease, background .25s ease;
+  background:none; border:none; color:rgba(255,255,255,0.4);
+  transition:all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+nav.tabbar button:active{ transform:scale(0.92); }
 nav.tabbar button.active{
-  opacity:1; color:#A855F7;
+  color:#A855F7;
   background:rgba(168,85,247,0.2);
   border:1px solid rgba(168,85,247,0.4);
   border-radius:16px;
 }
 nav.tabbar button.active .icon-mask{ filter:drop-shadow(0 0 4px rgba(168,85,247,0.6)); }
+
+/* Checkmark / shield completion celebration — a transient class added by
+   app.js only on the specific action that just marked something done, so it
+   never replays on unrelated re-renders. --pulse-color is set inline per
+   instance (violet for build, crimson for break). */
+@keyframes popSuccess{
+  0%{ transform:scale(1); }
+  35%{ transform:scale(1.35); }
+  60%{ transform:scale(0.92); }
+  100%{ transform:scale(1); }
+}
+@keyframes glowPulse{
+  0%{ box-shadow:0 0 0 rgba(0,0,0,0); }
+  40%{ box-shadow:0 0 24px 6px var(--pulse-color, rgba(139,92,246,0.55)); }
+  100%{ box-shadow:0 0 10px var(--pulse-color, rgba(139,92,246,0.5)); }
+}
+.celebrate{ animation:popSuccess 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), glowPulse 0.5s ease-out; }
+
+/* Modal sheet — animated via transform/opacity/visibility instead of
+   display:none/block (display isn't animatable). Closing delays the
+   visibility flip until the slide-down finishes; opening flips instantly. */
+#habit-modal{
+  transform:translateY(100%); opacity:0; visibility:hidden;
+  transition:transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease, visibility 0s linear 0.4s;
+}
+#habit-modal.open{
+  transform:translateY(0); opacity:1; visibility:visible;
+  transition:transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease, visibility 0s linear 0s;
+}
+/* Backdrop layer behind the sheet's own content, kept in lockstep with the
+   slide-up. Note: #habit-modal's own background is a fully opaque gradient,
+   so this blur has no visible target behind it today — it's wired up
+   correctly for if/when the sheet background ever becomes translucent. */
+#habit-modal .backdrop{
+  opacity:0; backdrop-filter:blur(0px); -webkit-backdrop-filter:blur(0px);
+  transition:opacity 0.3s ease, backdrop-filter 0.3s ease, -webkit-backdrop-filter 0.3s ease;
+}
+#habit-modal.open .backdrop{
+  opacity:1; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}

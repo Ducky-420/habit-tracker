@@ -1,8 +1,19 @@
 import { exportHabitsToFile, importHabitsFromFile, loadSettings, saveSettings } from '../storage.js';
 
-export function renderSettings(){
+export function renderSettings(habits = []){
   const settings = loadSettings();
+  const archived = habits.filter(h => h.archived);
   return `
+  ${archived.length ? `
+  <p class="eyebrow">Archived Habits (${archived.length})</p>
+  <div class="glass" style="margin-bottom:18px; overflow:hidden;">
+    ${archived.map((h, i) => `
+    <div class="js-unarchive-row ${i < archived.length - 1 ? 'hairline' : ''}" data-id="${h.id}" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; cursor:pointer;">
+      <span style="font:600 13px sans-serif; color:#fff;">${h.title}</span>
+      <span style="font:600 11px sans-serif; color:#C4A4FF;">Restore</span>
+    </div>`).join('')}
+  </div>` : ''}
+
   <p class="eyebrow">Data &amp; Backup</p>
   <div class="glass" style="margin-bottom:18px; overflow:hidden;">
     <div id="btn-export" class="hairline" style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px; cursor:pointer;">
@@ -63,8 +74,9 @@ export function renderSettings(){
   </div>`;
 }
 
-export function bindSettingsEvents(root, { getHabits, onGlowToggle }){
+export function bindSettingsEvents(root, { getHabits, onGlowToggle, onUnarchive }){
   const settings = loadSettings();
+  root.querySelectorAll('.js-unarchive-row').forEach(el => el.addEventListener('click', () => onUnarchive?.(Number(el.dataset.id))));
   root.querySelector('#btn-export').addEventListener('click', () => {
     exportHabitsToFile(getHabits());
     root.querySelector('#export-status').textContent = 'Downloaded ✓';

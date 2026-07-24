@@ -1,4 +1,4 @@
-const CACHE = 'habits-app-v3';
+const CACHE = 'habits-app-v6';
 const ASSETS = [
   '', 'index.html', 'manifest.json', 'icon.svg', 'css/glass-tokens.css',
   'js/app.js', 'js/storage.js',

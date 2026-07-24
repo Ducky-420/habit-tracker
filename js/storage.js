@@ -24,9 +24,10 @@ function makeHistory(density){
 
 function defaultHabits(){
   return [
-    { id:1, title:'Gym', desc:'', icon:'dumbbell', themeIdx:0, category:'Fitness', freq:'daily', freqN:1, goal:false, goalN:30, expanded:true, viewMode:'pill', history: makeHistory(0.6) },
-    { id:2, title:'Meditate', desc:'10 minutes, mornings', icon:'brain', themeIdx:2, category:'Mindset', freq:'daily', freqN:1, goal:true, goalN:21, expanded:false, viewMode:'pill', history: makeHistory(0.65) },
-    { id:3, title:'Side Project', desc:'', icon:'code', themeIdx:1, category:'Productivity', freq:'perday', freqN:2, goal:false, goalN:30, expanded:false, viewMode:'mosaic', history: makeHistory(0.55) },
+    { id:1, title:'Gym', desc:'', icon:'dumbbell', themeIdx:0, category:'Fitness', freq:'daily', freqN:1, goal:false, goalN:30, expanded:true, viewMode:'pill', type:'build', history: makeHistory(0.6) },
+    { id:2, title:'Meditate', desc:'10 minutes, mornings', icon:'brain', themeIdx:2, category:'Mindset', freq:'daily', freqN:1, goal:true, goalN:21, expanded:false, viewMode:'pill', type:'build', history: makeHistory(0.65) },
+    { id:3, title:'Side Project', desc:'', icon:'code', themeIdx:1, category:'Productivity', freq:'perday', freqN:2, goal:false, goalN:30, expanded:false, viewMode:'mosaic', type:'build', history: makeHistory(0.55) },
+    { id:4, title:'Late-Night Scrolling', desc:'Phone stays out of the bedroom', icon:'zap', themeIdx:7, category:'Lifestyle', freq:'daily', freqN:1, goal:false, goalN:30, expanded:true, viewMode:'pill', type:'break', history: makeHistory(0.7) },
   ];
 }
 
@@ -81,5 +82,12 @@ export function bestStreak(history){
   let best = 0, cur = 0;
   for (const v of history) { if (v > 0) { cur++; best = Math.max(best, cur); } else cur = 0; }
   return best;
+}
+export function currentStreak(history){
+  let cur = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i] > 0) cur++; else break;
+  }
+  return cur;
 }
 export function todayCount(habit){ return habit.history[habit.history.length - 1]; }
